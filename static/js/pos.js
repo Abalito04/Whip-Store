@@ -11,6 +11,8 @@
     cart: [], // { variant_id, product_id, name, size, color, sku, price, stock, quantity }
     selectedBrand: "TODAS",
     salesFilter: "ALL",
+    stockPage: 1,
+    stockPageSize: 10,
     channel: "LOCAL",
     paymentMethod: "EFECTIVO",
   };
@@ -622,6 +624,7 @@
     }
 
     const tbody = document.getElementById("posStockProductsBody");
+    const pagWrap = document.getElementById("posStockPagination");
     if (!tbody) return;
     const q = (document.getElementById("posStockSearch")?.value || "").trim().toLowerCase();
     const list = state.products.filter((p) => {
@@ -633,8 +636,15 @@
       );
     });
 
-    tbody.innerHTML = list.length
-      ? list
+    const totalPages = Math.max(1, Math.ceil(list.length / state.stockPageSize));
+    if (state.stockPage > totalPages) state.stockPage = totalPages;
+    if (state.stockPage < 1) state.stockPage = 1;
+
+    const startIdx = (state.stockPage - 1) * state.stockPageSize;
+    const pageItems = list.slice(startIdx, startIdx + state.stockPageSize);
+
+    tbody.innerHTML = pageItems.length
+      ? pageItems
           .map((p) => {
             const img = (p.images && p.images[0]) || "/static/images/cat-cascos.jpg";
             const variantsHtml = p.variants
@@ -670,13 +680,35 @@
                   ${p.is_active ? "● Activo" : "○ Pausado"}
                 </button>
               </td>
-              <td style="text-align:right;">
+              <td style="text-align:right; white-space:nowrap;">
+                <button type="button" class="btn btn-outline" style="height:30px; padding:0 9px; font-size:11.5px; margin-right:4px;" onclick="window.WhipPOS.openEditProduct(${p.id})">✏️ Editar</button>
                 <button type="button" class="btn btn-outline" style="height:30px; padding:0 9px; font-size:11px; border-color:#ef4444; color:#fca5a5;" onclick="window.WhipPOS.deleteProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}')">Eliminar</button>
               </td>
             </tr>`;
           })
           .join("")
       : `<tr><td colspan="5" style="text-align:center; padding:24px; color:var(--muted);">No se encontraron productos.</td></tr>`;
+
+    if (pagWrap) {
+      if (!list.length) {
+        pagWrap.innerHTML = "";
+      } else {
+        const from = startIdx + 1;
+        const to = Math.min(startIdx + state.stockPageSize, list.length);
+        let pageBtns = "";
+        for (let i = 1; i <= totalPages; i++) {
+          pageBtns += `<button type="button" class="pill-btn ${i === state.stockPage ? "active" : ""}" style="min-width:32px; height:30px; padding:0 10px; font-size:12px;" onclick="window.WhipPOS.setStockPage(${i})">${i}</button>`;
+        }
+        pagWrap.innerHTML = `
+          <span>Mostrando <strong>${from}–${to}</strong> de <strong>${list.length}</strong> productos</span>
+          <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+            <button type="button" class="btn btn-outline" style="height:30px; padding:0 10px; font-size:12px;" ${state.stockPage <= 1 ? "disabled" : ""} onclick="window.WhipPOS.setStockPage(${state.stockPage - 1})">← Anterior</button>
+            ${pageBtns}
+            <button type="button" class="btn btn-outline" style="height:30px; padding:0 10px; font-size:12px;" ${state.stockPage >= totalPages ? "disabled" : ""} onclick="window.WhipPOS.setStockPage(${state.stockPage + 1})">Siguiente →</button>
+          </div>
+        `;
+      }
+    }
   }
 
   async function setVariantStock(variantId, newStock) {
@@ -733,6 +765,156 @@
       await loadState();
     }
   }
+
+  // ---------------- EDITAR PRODUCTO COMPLETO ----------------
+  let editImages = [];
+
+  function renderEditImages() {
+    const wrap = document.getElementById("epImagesList");
+    if (!wrap) return;
+    if (!editImages.length) {
+      wrap.innerHTML = `<div style="font-size:12px; color:var(--muted);">Sin fotos cargadas.</div>`;
+      return;
+    }
+    wrap.innerHTML = editImages
+      .map(
+        (url, idx) => `<div style="position:relative; width:74px; height:74px; border-radius:9px; background:#f6f4ee; padding:4px; border:1px solid var(--border);">
+          <img src="${url}" alt="" style="width:100%; height:100%; object-fit:contain;">
+          <button type="button" onclick="window.WhipPOS.removeEditImage(${idx})" title="Quitar foto" style="position:absolute; top:-6px; right:-6px; width:20px; height:20px; border-radius:50%; border:none; background:#ef4444; color:#fff; font-size:11px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center;">✕</button>
+        </div>`
+      )
+      .join("");
+  }
+
+  function addEditVariantRow(v = { id: "", size: "", color: "Negro Mate", sku: "", stock: 0 }) {
+    const wrap = document.getElementById("epVariantsList");
+    if (!wrap) return;
+    const row = document.createElement("div");
+    row.className = "ep-variant-row";
+    row.style.cssText = "display:grid; grid-template-columns:75px 1fr 1.1fr 75px 32px; gap:6px; align-items:center;";
+    row.innerHTML = `
+      <input type="hidden" class="ev-id" value="${v.id || ""}">
+      <input type="text" class="ev-size" value="${(v.size || "").replace(/"/g, "&quot;")}" placeholder="M" required style="height:34px; padding:0 8px; border-radius:7px; border:1px solid var(--border); background:#120e08; color:#fff; font-size:12.5px;">
+      <input type="text" class="ev-color" value="${(v.color || "").replace(/"/g, "&quot;")}" placeholder="Negro" style="height:34px; padding:0 8px; border-radius:7px; border:1px solid var(--border); background:#120e08; color:#fff; font-size:12.5px;">
+      <input type="text" class="ev-sku" value="${(v.sku || "").replace(/"/g, "&quot;")}" placeholder="Auto SKU" style="height:34px; padding:0 8px; border-radius:7px; border:1px solid var(--border); background:#120e08; color:#fff; font-size:12px; font-family:monospace;">
+      <input type="number" class="ev-stock" value="${v.stock ?? 0}" min="0" style="height:34px; padding:0 8px; border-radius:7px; border:1px solid var(--border); background:#120e08; color:#ffd700; font-weight:700; font-size:12.5px;">
+      <button type="button" onclick="this.parentElement.remove()" title="Quitar talle" style="width:30px; height:34px; border-radius:7px; border:1px solid rgba(239,68,68,0.4); background:rgba(239,68,68,0.12); color:#fca5a5; cursor:pointer; font-weight:800;">✕</button>
+    `;
+    wrap.appendChild(row);
+  }
+
+  function openEditProduct(productId) {
+    const p = state.products.find((x) => x.id === productId);
+    if (!p) return;
+
+    document.getElementById("epId").value = p.id;
+    document.getElementById("epName").value = p.name || "";
+    document.getElementById("epBrand").value = p.brand || "";
+    document.getElementById("epCategory").value = p.category_slug || "cascos";
+    document.getElementById("epPrice").value = p.price || 0;
+    document.getElementById("epComparePrice").value = p.compare_at_price || "";
+    document.getElementById("epTransferDiscount").value = p.transfer_discount ?? 15;
+    document.getElementById("epIsActive").checked = Boolean(p.is_active);
+    document.getElementById("epIsFeatured").checked = Boolean(p.is_featured);
+    document.getElementById("epDescription").value = p.description || "";
+    document.getElementById("epImageUrlInput").value = "";
+
+    editImages = [...(p.images || [])];
+    renderEditImages();
+
+    const vWrap = document.getElementById("epVariantsList");
+    vWrap.innerHTML = "";
+    (p.variants || []).forEach((v) => addEditVariantRow(v));
+
+    document.getElementById("posEditProductModal").classList.add("open");
+  }
+
+  async function uploadEditImage(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append("file", file);
+    try {
+      const res = await fetch("/api/admin/upload-image", { method: "POST", body: fd });
+      const data = await res.json();
+      if (data.ok && data.url) {
+        editImages.push(data.url);
+        renderEditImages();
+        toast("📷 Foto subida correctamente");
+      } else {
+        toast(data.error || "Error subiendo imagen", true);
+      }
+    } catch {
+      toast("Error de conexión al subir imagen", true);
+    } finally {
+      input.value = "";
+    }
+  }
+
+  function addEditImageUrl() {
+    const inp = document.getElementById("epImageUrlInput");
+    const url = (inp?.value || "").trim();
+    if (!url) return;
+    editImages.push(url);
+    inp.value = "";
+    renderEditImages();
+  }
+
+  function removeEditImage(idx) {
+    editImages.splice(idx, 1);
+    renderEditImages();
+  }
+
+  document.getElementById("posEditProductForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const id = parseInt(document.getElementById("epId").value, 10);
+    const btn = document.getElementById("epSaveBtn");
+    btn.disabled = true;
+    btn.textContent = "Guardando...";
+
+    const variants = Array.from(document.querySelectorAll("#epVariantsList .ep-variant-row")).map((row) => ({
+      id: row.querySelector(".ev-id").value || null,
+      size: row.querySelector(".ev-size").value.trim(),
+      color: row.querySelector(".ev-color").value.trim(),
+      sku: row.querySelector(".ev-sku").value.trim(),
+      stock: parseInt(row.querySelector(".ev-stock").value || "0", 10) || 0,
+    }));
+
+    const payload = {
+      name: document.getElementById("epName").value.trim(),
+      brand: document.getElementById("epBrand").value.trim(),
+      category_slug: document.getElementById("epCategory").value,
+      price: parseInt(document.getElementById("epPrice").value || "0", 10) || 0,
+      compare_at_price: parseInt(document.getElementById("epComparePrice").value || "0", 10) || null,
+      transfer_discount: parseInt(document.getElementById("epTransferDiscount").value || "15", 10) || 0,
+      is_active: document.getElementById("epIsActive").checked,
+      is_featured: document.getElementById("epIsFeatured").checked,
+      description: document.getElementById("epDescription").value.trim(),
+      images: editImages,
+      variants,
+    };
+
+    try {
+      const res = await fetch(`/api/admin/product/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        document.getElementById("posEditProductModal").classList.remove("open");
+        toast("✅ Producto actualizado en Local y Web");
+        await loadState();
+      } else {
+        toast(data.error || "Error al guardar cambios", true);
+      }
+    } catch {
+      toast("Error de conexión al guardar.", true);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Guardar Cambios";
+    }
+  });
 
   document.getElementById("posNewProductForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -908,11 +1090,24 @@
       if (o) openReceiptModal(o);
     },
     renderStockTab,
+    onStockSearch() {
+      state.stockPage = 1;
+      renderStockTab();
+    },
+    setStockPage(page) {
+      state.stockPage = page;
+      renderStockTab();
+    },
     quickRestock: setVariantStock,
     setVariantStock,
     savePrice,
     toggleActive,
     deleteProduct,
+    openEditProduct,
+    uploadEditImage,
+    addEditImageUrl,
+    removeEditImage,
+    addEditVariantRow,
     setSalesFilter(f, btn) {
       state.salesFilter = f;
       document.querySelectorAll(".sales-filter-btn").forEach((b) => b.classList.remove("active"));

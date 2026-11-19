@@ -171,7 +171,7 @@
           type="text"
           id="posStockSearch"
           placeholder="Buscar producto por nombre, marca o SKU..."
-          oninput="window.WhipPOS.renderStockTab()"
+          oninput="window.WhipPOS.onStockSearch()"
           style="height:40px; padding:0 14px; border-radius:9px; border:1px solid var(--border-strong); background:#120e08; color:#fff; width:100%; max-width:380px; font-size:13.5px;"
         >
         <button type="button" class="btn btn-cta" style="height:40px; font-size:13px;" onclick="document.getElementById('posNewProductModal').classList.add('open')">+ Nuevo Producto</button>
@@ -186,6 +186,7 @@
             <tbody id="posStockProductsBody"></tbody>
           </table>
         </div>
+        <div id="posStockPagination" style="padding:12px 16px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; font-size:12.5px; color:var(--muted);"></div>
       </div>
 
       <details id="posLowStockCard" class="card-panel" style="padding:0; overflow:hidden; border-color:rgba(255,215,0,0.42);">
@@ -406,6 +407,85 @@
     </div>
   </div>
 
+  <!-- MODAL EDITAR PRODUCTO COMPLETO -->
+  <div class="modal-backdrop" id="posEditProductModal" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="modal-box" style="max-width:660px; max-height:92vh; overflow-y:auto;">
+      <div class="cart-head">
+        <h2>✏️ Editar Producto</h2>
+        <button type="button" onclick="document.getElementById('posEditProductModal').classList.remove('open')" style="background:none; border:none; font-size:20px; cursor:pointer; color:var(--ink);">✕</button>
+      </div>
+      <form id="posEditProductForm" style="padding:20px; display:flex; flex-direction:column; gap:14px;">
+        <input type="hidden" id="epId">
+        <div class="field">
+          <label>Nombre del producto *</label>
+          <input type="text" id="epName" required>
+        </div>
+        <div class="form-grid">
+          <div class="field"><label>Marca *</label><input type="text" id="epBrand" required></div>
+          <div class="field">
+            <label>Categoría</label>
+            <select id="epCategory">
+              <option value="cascos">Cascos</option>
+              <option value="antiparras">Antiparras</option>
+              <option value="indumentaria">Indumentaria</option>
+              <option value="accesorios">Accesorios</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px;">
+          <div class="field"><label>Precio (ARS) *</label><input type="number" id="epPrice" min="0" required></div>
+          <div class="field"><label>Precio tachado (opcional)</label><input type="number" id="epComparePrice" min="0" placeholder="Sin oferta"></div>
+          <div class="field"><label>Desc. Transf. (%)</label><input type="number" id="epTransferDiscount" min="0" max="90" value="15"></div>
+        </div>
+        <div style="display:flex; gap:18px; flex-wrap:wrap; font-size:13px;">
+          <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="checkbox" id="epIsActive"> Visible en la tienda web
+          </label>
+          <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="checkbox" id="epIsFeatured"> Destacado en inicio
+          </label>
+        </div>
+        <div class="field">
+          <label>Descripción</label>
+          <textarea id="epDescription" rows="3" style="width:100%; padding:10px 12px; border-radius:9px; border:1px solid var(--border); background:#120e08; color:#fff; font-family:inherit; font-size:13px; resize:vertical;"></textarea>
+        </div>
+
+        <!-- FOTOS -->
+        <div style="padding:12px; border-radius:10px; background:var(--surface-2); border:1px solid var(--border);">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
+            <strong style="font-size:13px; color:#ffd700;">📷 Fotos del producto</strong>
+            <label class="btn btn-outline" style="height:30px; padding:0 10px; font-size:11.5px; cursor:pointer;">
+              📤 Subir foto desde PC
+              <input type="file" id="epImageFileInput" accept="image/png,image/jpeg,image/webp" style="display:none;" onchange="window.WhipPOS.uploadEditImage(this)">
+            </label>
+          </div>
+          <div id="epImagesList" style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px;"></div>
+          <div style="display:flex; gap:6px;">
+            <input type="text" id="epImageUrlInput" placeholder="O pegá una URL / ruta de imagen (ej: /static/images/...)" style="flex:1; height:34px; padding:0 10px; border-radius:8px; border:1px solid var(--border); background:#120e08; color:#fff; font-size:12px;">
+            <button type="button" class="btn btn-outline" style="height:34px; padding:0 12px; font-size:12px;" onclick="window.WhipPOS.addEditImageUrl()">+ Agregar</button>
+          </div>
+        </div>
+
+        <!-- TALLES / VARIANTES -->
+        <div style="padding:12px; border-radius:10px; background:var(--surface-2); border:1px solid var(--border);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <strong style="font-size:13px; color:#ffd700;">🏷️ Talles / Variantes y Stock</strong>
+            <button type="button" class="btn btn-outline" style="height:28px; padding:0 10px; font-size:11.5px;" onclick="window.WhipPOS.addEditVariantRow()">+ Agregar talle</button>
+          </div>
+          <div style="display:grid; grid-template-columns:75px 1fr 1.1fr 75px 32px; gap:6px; font-size:11px; color:var(--muted); margin-bottom:5px; font-weight:700;">
+            <span>Talle</span><span>Color</span><span>SKU / Código</span><span>Stock</span><span></span>
+          </div>
+          <div id="epVariantsList" style="display:flex; flex-direction:column; gap:6px;"></div>
+        </div>
+
+        <div style="display:flex; gap:10px; margin-top:4px;">
+          <button type="button" class="btn btn-outline" style="flex:1;" onclick="document.getElementById('posEditProductModal').classList.remove('open')">Cancelar</button>
+          <button type="submit" id="epSaveBtn" class="btn btn-cta" style="flex:1;">Guardar Cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- MODAL TICKET IMPRIMIBLE -->
   <div class="modal-backdrop" id="receiptModal" onclick="if(event.target===this)this.classList.remove('open')">
     <div class="modal-box" style="max-width:420px;">
@@ -454,6 +534,6 @@
   <div id="posToast" class="pos-toast"></div>
 {% endif %}
 
-<script src="{{ url_for('static', filename='js/pos.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/pos.js') }}?v=4"></script>
 </body>
 </html>

@@ -3,6 +3,7 @@ import os
 import re
 import time
 from datetime import datetime
+from werkzeug.utils import secure_filename
 from flask import Flask, jsonify, redirect, render_template, request, session
 from sqlalchemy import inspect, text
 from models import (
@@ -432,6 +433,31 @@ def api_admin_update_variant(variant_id):
     return jsonify({"ok": True, "variant": variant.to_dict()})
 
 
+@app.route("/api/admin/upload-image", methods=["POST"])
+def api_admin_upload_image():
+    unauth = require_admin()
+    if unauth:
+        return unauth
+
+    file = request.files.get("file")
+    if not file or not file.filename:
+        return jsonify({"ok": False, "error": "No se seleccionó ningún archivo."}), 400
+
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in (".png", ".jpg", ".jpeg", ".webp", ".gif"):
+        return jsonify({"ok": False, "error": "Formato no permitido. Usá PNG, JPG o WEBP."}), 400
+
+    upload_dir = os.path.join(app.static_folder, "images", "uploads")
+    os.makedirs(upload_dir, exist_ok=True)
+
+    safe_base = secure_filename(os.path.splitext(file.filename)[0]) or "producto"
+    filename = f"{safe_base}-{int(time.time())}{ext}"
+    filepath = os.path.join(upload_dir, filename)
+    file.save(filepath)
+
+    return jsonify({"ok": True, "url": f"/static/images/uploads/{filename}"})
+
+
 @app.route("/api/admin/product/<int:product_id>", methods=["PATCH", "DELETE"])
 def api_admin_product(product_id):
     unauth = require_admin()
@@ -447,12 +473,88 @@ def api_admin_product(product_id):
         return jsonify({"ok": True})
 
     data = request.get_json(silent=True) or {}
-    if "price" in data:
-        product.price = max(0, int(data["price"]))
-    if "is_active" in data:
-        product.is_active = bool(data["is_active"])
-    db.session.commit()
-    return jsonify({"ok": True, "product": product.to_dict()})
+    try:
+        if "name" in data and str(data["name"]).strip():
+            product.name = str(data["name"]).strip()
+        if "brand" in data and str(data["brand"]).strip():
+            product.brand = str(data["brand"]).strip()
+        if "category_slug" in data:
+            cat = Category.query.filter_by(slug=str(data["category_slug"]).strip()).first()
+            if cat:
+                product.category = cat
+        if "description" in data:
+            product.description = str(data["description"] or "").strip()
+        if "price" in data:
+            product.price = max(0, int(data["price"]))
+        if "compare_at_price" in data:
+            cap = data["compare_at_price"]
+            product.compare_at_price = int(cap) if cap and int(cap) > 0 else None
+        if "transfer_discount" in data:
+            product.transfer_discount = max(0, min(90, int(data["transfer_discount"] or 0)))
+        if "is_active" in data:
+            product.is_active = bool(data["is_active"])
+        if "is_featured" in data:
+            product.is_featured = bool(data["is_featured"])
+        if "images" in data and isinstance(data["images"], list):
+            cleaned_imgs = [str(u).strip() for u in data["images"] if str(u).strip()]
+            product.images_json = cleaned_imgs
+
+        if "variants" in data and isinstance(data["variants"], list):
+            existing_map = {v.id: v for v in product.variants}
+            kept_ids = set()
+
+            for idx, vdata in enumerate(data["variants"]):
+                size = str(vdata.get("size") or "").strip()
+                if not size:
+                    continue
+                color = str(vdata.get("color") or "Único").strip()
+                sku = str(vdata.get("sku") or "").strip()
+                if not sku:
+                    sku = f"{product.brand[:3].upper()}-{product.id}-{size}-{int(time.time()) % 1000}{idx}"
+                new_stock = max(0, int(vdata.get("stock") or 0))
+                vid = vdata.get("id")
+
+                if vid and int(vid) in existing_map:
+                    v = existing_map[int(vid)]
+                    kept_ids.add(v.id)
+                    old_stock = v.stock
+                    v.size = size
+                    v.color = color
+                    v.sku = sku
+                    v.stock = new_stock
+                    delta = new_stock - old_stock
+                    if delta != 0:
+                        record_stock_movement(
+                            v,
+                            delta,
+                            "INGRESO" if delta > 0 else "AJUSTE",
+                            reason="Edición de producto desde POS",
+                        )
+                else:
+                    v = ProductVariant(
+                        product_id=product.id,
+                        size=size,
+                        color=color,
+                        sku=sku,
+                        stock=new_stock,
+                    )
+                    db.session.add(v)
+                    db.session.flush()
+                    kept_ids.add(v.id)
+                    if new_stock > 0:
+                        record_stock_movement(v, new_stock, "INGRESO", reason="Nueva variante desde POS")
+
+            for old_id, old_v in existing_map.items():
+                if old_id not in kept_ids:
+                    OrderItem.query.filter_by(variant_id=old_id).update({"variant_id": None})
+                    StockMovement.query.filter_by(variant_id=old_id).update({"variant_id": None})
+                    db.session.delete(old_v)
+
+        db.session.commit()
+        return jsonify({"ok": True, "product": product.to_dict()})
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({"ok": False, "error": f"Error al guardar cambios: {exc}"}), 400
 
 
 @app.route("/api/admin/products", methods=["POST"])
