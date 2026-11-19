@@ -195,10 +195,10 @@
     }, 4500);
   }
 
-  // Live search
-  function initSearch() {
-    const input = document.getElementById("desktopSearchInput");
-    const dropdown = document.getElementById("desktopSearchDropdown");
+  // Live search (Desktop + Mobile)
+  function bindLiveSearch(inputId, dropdownId) {
+    const input = document.getElementById(inputId);
+    const dropdown = document.getElementById(dropdownId);
     if (!input || !dropdown) return;
 
     let timer = null;
@@ -215,7 +215,7 @@
           const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
           const items = await res.json();
           if (!items.length) {
-            dropdown.innerHTML = `<div style="padding:14px; font-size:13px; color:#6b7280; text-align:center;">Sin resultados para "${q}"</div>`;
+            dropdown.innerHTML = `<div style="padding:14px; font-size:13px; color:#b8b0a0; text-align:center;">Sin resultados para "${q}"</div>`;
           } else {
             dropdown.innerHTML = items
               .map(
@@ -243,6 +243,32 @@
       if (!input.contains(e.target) && !dropdown.contains(e.target)) {
         dropdown.classList.remove("open");
       }
+    });
+  }
+
+  function initSearch() {
+    bindLiveSearch("desktopSearchInput", "desktopSearchDropdown");
+    bindLiveSearch("mobileSearchInput", "mobileSearchDropdown");
+
+    const openBtn = document.getElementById("mobileSearchBtn");
+    const closeBtn = document.getElementById("mobileSearchClose");
+    const bar = document.getElementById("mobileSearchBar");
+    const input = document.getElementById("mobileSearchInput");
+    const dropdown = document.getElementById("mobileSearchDropdown");
+
+    openBtn?.addEventListener("click", () => {
+      const isOpen = bar?.classList.toggle("open");
+      if (isOpen) {
+        setTimeout(() => input?.focus(), 60);
+      } else {
+        dropdown?.classList.remove("open");
+      }
+    });
+
+    closeBtn?.addEventListener("click", () => {
+      bar?.classList.remove("open");
+      if (input) input.value = "";
+      dropdown?.classList.remove("open");
     });
   }
 

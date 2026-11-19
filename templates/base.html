@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=3">
 </head>
 <body>
   <!-- TOP ANNOUNCEMENT BAR -->
@@ -42,6 +42,7 @@
       </div>
 
       <div class="header-actions">
+        <button type="button" class="mobile-search-btn" id="mobileSearchBtn" aria-label="Buscar">🔍</button>
         <a href="/admin" class="admin-pill" title="Panel de Administración">🛡️ Admin</a>
         <button type="button" class="cart-btn" onclick="window.WhipStore.openCart()">
           <span class="cart-icon-wrap">
@@ -53,6 +54,17 @@
             <strong id="headerCartTotal">$ 0</strong>
           </span>
         </button>
+      </div>
+    </div>
+
+    <!-- Mobile Live Search Bar (toggleable) -->
+    <div class="mobile-search-bar" id="mobileSearchBar">
+      <div class="container">
+        <div class="mobile-search-inner">
+          <input type="text" id="mobileSearchInput" class="search-input" placeholder="¿Qué casco o accesorio buscás?" autocomplete="off">
+          <button type="button" id="mobileSearchClose" class="mobile-search-close" aria-label="Cerrar búsqueda">✕</button>
+        </div>
+        <div id="mobileSearchDropdown" class="search-dropdown mobile-dropdown"></div>
       </div>
     </div>
 
@@ -180,7 +192,7 @@
     💬 <span>¿Dudas con el talle?</span>
   </a>
 
-  <script src="{{ url_for('static', filename='js/store.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/store.js') }}?v=3"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>
