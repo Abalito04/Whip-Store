@@ -1,8 +1,21 @@
+import hmac
 import os
 import re
 import time
-from flask import Flask, jsonify, render_template, request, session
-from models import Category, Order, OrderItem, Product, ProductVariant, db
+from datetime import datetime
+from flask import Flask, jsonify, redirect, render_template, request, session
+from sqlalchemy import inspect, text
+from models import (
+    CashMovement,
+    CashSession,
+    Category,
+    Order,
+    OrderItem,
+    Product,
+    ProductVariant,
+    StockMovement,
+    db,
+)
 from seed import seed_database
 
 FREE_SHIPPING_THRESHOLD = 250000
@@ -25,8 +38,38 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db.init_app(app)
 
+
+def ensure_schema_updates():
+    """Agrega columnas nuevas a tablas existentes sin perder datos (SQLite / PostgreSQL)."""
+    inspector = inspect(db.engine)
+    if "orders" in inspector.get_table_names():
+        existing_cols = {c["name"] for c in inspector.get_columns("orders")}
+        if "channel" not in existing_cols:
+            db.session.execute(text("ALTER TABLE orders ADD COLUMN channel VARCHAR(20) DEFAULT 'WEB'"))
+        if "notes" not in existing_cols:
+            db.session.execute(text("ALTER TABLE orders ADD COLUMN notes VARCHAR(255) DEFAULT ''"))
+        db.session.commit()
+
+
+def record_stock_movement(variant, delta, movement_type, reason="", order_id=None):
+    db.session.add(
+        StockMovement(
+            variant_id=variant.id,
+            order_id=order_id,
+            product_name=variant.product.name if variant.product else "Producto",
+            variant_label=f"Talle {variant.size} · {variant.color}",
+            sku=variant.sku,
+            movement_type=movement_type,
+            quantity_delta=delta,
+            stock_after=variant.stock,
+            reason=reason,
+        )
+    )
+
+
 with app.app_context():
     db.create_all()
+    ensure_schema_updates()
     seed_database()
 
 
@@ -157,7 +200,12 @@ def checkout():
 
 @app.route("/admin")
 def admin_panel():
-    return render_template("admin.html", is_authed=bool(session.get("admin_authed")))
+    return redirect("/pos")
+
+
+@app.route("/pos")
+def pos_panel():
+    return render_template("pos.html", is_authed=bool(session.get("admin_authed")))
 
 
 # ---------------------------------------------------------------------------
@@ -278,6 +326,13 @@ def api_checkout():
                     unit_price=variant.product.price,
                 )
             )
+            record_stock_movement(
+                variant,
+                -qty,
+                "VENTA_WEB",
+                reason=f"Pedido Web #{new_order.order_number}",
+                order_id=new_order.id,
+            )
 
         db.session.commit()
         return jsonify({"ok": True, "order": new_order.to_dict()})
@@ -300,12 +355,16 @@ def require_admin():
 @app.route("/api/admin/login", methods=["POST"])
 def api_admin_login():
     data = request.get_json(silent=True) or {}
-    email = (data.get("email") or "").strip()
+    email = (data.get("email") or "").strip().lower()
     password = (data.get("password") or "").strip()
-    if email and len(password) >= 4:
+
+    expected_email = os.environ.get("ADMIN_EMAIL", "admin@whip-helmets.com.ar").strip().lower()
+    expected_password = os.environ.get("ADMIN_PASSWORD", "whip2026").strip()
+
+    if hmac.compare_digest(email, expected_email) and hmac.compare_digest(password, expected_password):
         session["admin_authed"] = True
         return jsonify({"ok": True})
-    return jsonify({"ok": False, "error": "Ingresá un email y contraseña válidos."}), 400
+    return jsonify({"ok": False, "error": "Credenciales incorrectas."}), 401
 
 
 @app.route("/api/admin/logout", methods=["POST"])
@@ -358,7 +417,17 @@ def api_admin_update_variant(variant_id):
     if not variant:
         return jsonify({"ok": False, "error": "Variante no encontrada"}), 404
     data = request.get_json(silent=True) or {}
-    variant.stock = max(0, int(data.get("stock", variant.stock)))
+    old_stock = variant.stock
+    new_stock = max(0, int(data.get("stock", variant.stock)))
+    variant.stock = new_stock
+    delta = new_stock - old_stock
+    if delta != 0:
+        record_stock_movement(
+            variant,
+            delta,
+            "INGRESO" if delta > 0 else "AJUSTE",
+            reason="Ajuste manual desde /admin",
+        )
     db.session.commit()
     return jsonify({"ok": True, "variant": variant.to_dict()})
 
@@ -401,8 +470,10 @@ def api_admin_create_product():
     cat = Category.query.filter_by(slug=cat_slug).first() or Category.query.first()
     price = max(1000, int(data.get("price") or 350000))
     color = (data.get("color") or "Negro Mate").strip()
+    stock_s = max(0, int(data.get("stock_s") or 0))
     stock_m = max(0, int(data.get("stock_m") or 0))
     stock_l = max(0, int(data.get("stock_l") or 0))
+    stock_xl = max(0, int(data.get("stock_xl") or 0))
 
     slug_base = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
     slug = f"{slug_base}-{str(int(time.time()))[-4:]}"
@@ -417,7 +488,7 @@ def api_admin_create_product():
         transfer_discount=15,
         is_active=True,
         is_featured=True,
-        description="Producto cargado desde el panel de administración de Whip Store.",
+        description="Producto cargado desde el gestor Whip POS.",
         images_json=[
             "/static/images/cascos/Fox-V1-Rojo frontal.png",
             "/static/images/cascos/Fox-V1-Rojo izquierda.png",
@@ -433,16 +504,18 @@ def api_admin_create_product():
     db.session.add(prod)
     db.session.flush()
 
-    for size, st in [("S", 1), ("M", stock_m), ("L", stock_l), ("XL", 0)]:
-        db.session.add(
-            ProductVariant(
-                product_id=prod.id,
-                size=size,
-                color=color,
-                sku=f"{sku_prefix}-{size}",
-                stock=st,
-            )
+    for size, st in [("S", stock_s), ("M", stock_m), ("L", stock_l), ("XL", stock_xl)]:
+        v = ProductVariant(
+            product_id=prod.id,
+            size=size,
+            color=color,
+            sku=f"{sku_prefix}-{size}",
+            stock=st,
         )
+        db.session.add(v)
+        db.session.flush()
+        if st > 0:
+            record_stock_movement(v, st, "INGRESO", reason="Stock inicial al crear producto")
     db.session.commit()
     return jsonify({"ok": True, "product": prod.to_dict()})
 
@@ -486,11 +559,331 @@ def api_admin_restore_stock(order_id):
             variant = db.session.get(ProductVariant, item.variant_id)
             if variant:
                 variant.stock += item.quantity
+                record_stock_movement(
+                    variant,
+                    item.quantity,
+                    "DEVOLUCION",
+                    reason=f"Anulación Pedido #{order.order_number}",
+                    order_id=order.id,
+                )
 
     order.payment_status = "CANCELLED"
     order.stock_restored = True
     db.session.commit()
     return jsonify({"ok": True, "order": order.to_dict()})
+
+
+# ---------------------------------------------------------------------------
+# API POS LOCAL (/api/pos/*) — Punto de Venta, Caja Diaria e Historial Stock
+# ---------------------------------------------------------------------------
+
+
+@app.route("/api/pos/state")
+def api_pos_state():
+    unauth = require_admin()
+    if unauth:
+        return unauth
+
+    products = Product.query.order_by(Product.is_active.desc(), Product.brand.asc(), Product.name.asc()).all()
+    active_session = CashSession.query.filter_by(status="OPEN").order_by(CashSession.id.desc()).first()
+    closed_sessions = CashSession.query.filter_by(status="CLOSED").order_by(CashSession.id.desc()).limit(10).all()
+    recent_sales = Order.query.order_by(Order.id.desc()).limit(60).all()
+    recent_movements = StockMovement.query.order_by(StockMovement.id.desc()).limit(80).all()
+
+    low_stock = []
+    for p in products:
+        if not p.is_active:
+            continue
+        for v in p.variants:
+            if v.stock <= 2:
+                low_stock.append(
+                    {
+                        "product_id": p.id,
+                        "product_name": p.name,
+                        "brand": p.brand,
+                        "variant_id": v.id,
+                        "size": v.size,
+                        "sku": v.sku,
+                        "stock": v.stock,
+                    }
+                )
+    low_stock.sort(key=lambda x: x["stock"])
+
+    return jsonify(
+        {
+            "ok": True,
+            "products": [p.to_dict() for p in products],
+            "low_stock": low_stock,
+            "active_session": active_session.to_dict(include_movements=True) if active_session else None,
+            "closed_sessions": [s.to_dict(include_movements=False) for s in closed_sessions],
+            "recent_sales": [o.to_dict() for o in recent_sales],
+            "recent_movements": [m.to_dict() for m in recent_movements],
+        }
+    )
+
+
+@app.route("/api/pos/lookup")
+def api_pos_lookup():
+    """Búsqueda rápida para lector de código de barras (SKU exacto o parcial)."""
+    unauth = require_admin()
+    if unauth:
+        return unauth
+
+    code = (request.args.get("code") or "").strip()
+    if not code:
+        return jsonify({"ok": False, "error": "Código vacío."}), 400
+
+    variant = ProductVariant.query.filter(ProductVariant.sku.ilike(code)).first()
+    if not variant:
+        variant = ProductVariant.query.filter(ProductVariant.sku.ilike(f"%{code}%")).first()
+    if not variant or not variant.product:
+        return jsonify({"ok": False, "error": f"No se encontró ningún producto con código/SKU '{code}'."}), 404
+
+    return jsonify(
+        {
+            "ok": True,
+            "variant": variant.to_dict(),
+            "product": variant.product.to_dict(),
+        }
+    )
+
+
+@app.route("/api/pos/sales", methods=["POST"])
+def api_pos_create_sale():
+    unauth = require_admin()
+    if unauth:
+        return unauth
+
+    data = request.get_json(silent=True) or {}
+    items_req = data.get("items") or []
+    if not items_req:
+        return jsonify({"ok": False, "error": "Agregá al menos un producto al ticket."}), 400
+
+    channel = (data.get("channel") or "LOCAL").upper()
+    if channel not in ("LOCAL", "WHATSAPP", "INSTAGRAM"):
+        channel = "LOCAL"
+
+    payment_method = (data.get("payment_method") or "EFECTIVO").upper()
+    if payment_method not in ("EFECTIVO", "TRANSFERENCIA", "DEBITO", "CREDITO", "MERCADOPAGO"):
+        payment_method = "EFECTIVO"
+
+    customer_name = (data.get("customer_name") or "").strip() or "Cliente Mostrador"
+    customer_phone = (data.get("customer_phone") or "").strip() or "-"
+    notes = (data.get("notes") or "").strip()
+
+    try:
+        subtotal = 0
+        order_items_to_create = []
+
+        for item in items_req:
+            variant_id = int(item.get("variant_id", 0))
+            qty = int(item.get("quantity", 1))
+            if qty <= 0:
+                return jsonify({"ok": False, "error": "Cantidad inválida."}), 400
+
+            variant = db.session.get(ProductVariant, variant_id)
+            if not variant or not variant.product:
+                return jsonify({"ok": False, "error": "Variante no encontrada."}), 404
+
+            if variant.stock < qty:
+                return (
+                    jsonify(
+                        {
+                            "ok": False,
+                            "error": f"Stock insuficiente para {variant.product.name} ({variant.size}). Disponible: {variant.stock}.",
+                        }
+                    ),
+                    409,
+                )
+
+            unit_price = int(item.get("unit_price") or variant.product.price)
+            subtotal += unit_price * qty
+            order_items_to_create.append((variant, qty, unit_price))
+
+        manual_discount = max(0, int(data.get("discount_amount") or 0))
+        apply_transfer_discount = bool(data.get("apply_transfer_discount", False))
+        auto_discount = round(subtotal * (TRANSFER_DISCOUNT_PCT / 100)) if apply_transfer_discount else 0
+        discount_amount = min(subtotal, manual_discount + auto_discount)
+        total = max(0, subtotal - discount_amount)
+
+        last_order = Order.query.order_by(Order.order_number.desc()).first()
+        next_number = (last_order.order_number + 1) if last_order else 1001
+
+        new_order = Order(
+            order_number=next_number,
+            customer_name=customer_name,
+            customer_email="mostrador@whip-helmets.com.ar",
+            customer_phone=customer_phone,
+            shipping_address="Retiro en Local / Showroom",
+            postal_code="-",
+            city="Local Whip",
+            province="Argentina",
+            payment_method=payment_method,
+            payment_status="PAID",
+            shipping_status="DELIVERED" if channel == "LOCAL" else "PREPARING",
+            channel=channel,
+            notes=notes,
+            subtotal=subtotal,
+            discount_amount=discount_amount,
+            shipping_cost=0,
+            total=total,
+        )
+        db.session.add(new_order)
+        db.session.flush()
+
+        for variant, qty, unit_price in order_items_to_create:
+            variant.stock -= qty
+            db.session.add(
+                OrderItem(
+                    order_id=new_order.id,
+                    variant_id=variant.id,
+                    product_name=variant.product.name,
+                    variant_label=f"Talle {variant.size} · {variant.color}",
+                    image_url=(variant.product.images_json or ["/static/images/cat-cascos.jpg"])[0],
+                    quantity=qty,
+                    unit_price=unit_price,
+                )
+            )
+            record_stock_movement(
+                variant,
+                -qty,
+                "VENTA_LOCAL",
+                reason=f"Venta {channel} #{new_order.order_number} ({payment_method})",
+                order_id=new_order.id,
+            )
+
+        # Registrar ingreso en la caja abierta (si existe una sesión abierta)
+        active_session = CashSession.query.filter_by(status="OPEN").order_by(CashSession.id.desc()).first()
+        if active_session:
+            db.session.add(
+                CashMovement(
+                    session_id=active_session.id,
+                    order_id=new_order.id,
+                    movement_type="VENTA",
+                    payment_method=payment_method,
+                    amount=total,
+                    description=f"Venta #{new_order.order_number} · {customer_name} ({channel})",
+                )
+            )
+
+        db.session.commit()
+        return jsonify({"ok": True, "order": new_order.to_dict(), "cash_recorded": bool(active_session)})
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({"ok": False, "error": f"Error al registrar venta: {exc}"}), 500
+
+
+@app.route("/api/pos/cash/open", methods=["POST"])
+def api_pos_cash_open():
+    unauth = require_admin()
+    if unauth:
+        return unauth
+
+    existing = CashSession.query.filter_by(status="OPEN").first()
+    if existing:
+        return jsonify({"ok": False, "error": "Ya hay una caja abierta."}), 409
+
+    data = request.get_json(silent=True) or {}
+    opening_amount = max(0, int(data.get("opening_amount") or 0))
+    notes = (data.get("notes") or "").strip()
+
+    new_session = CashSession(opening_amount=opening_amount, notes=notes, status="OPEN")
+    db.session.add(new_session)
+    db.session.commit()
+    return jsonify({"ok": True, "session": new_session.to_dict(include_movements=True)})
+
+
+@app.route("/api/pos/cash/movement", methods=["POST"])
+def api_pos_cash_movement():
+    unauth = require_admin()
+    if unauth:
+        return unauth
+
+    active_session = CashSession.query.filter_by(status="OPEN").order_by(CashSession.id.desc()).first()
+    if not active_session:
+        return jsonify({"ok": False, "error": "Abrí la caja antes de registrar movimientos."}), 400
+
+    data = request.get_json(silent=True) or {}
+    movement_type = (data.get("movement_type") or "EGRESO").upper()
+    if movement_type not in ("INGRESO", "EGRESO"):
+        return jsonify({"ok": False, "error": "Tipo de movimiento inválido."}), 400
+
+    amount = int(data.get("amount") or 0)
+    if amount <= 0:
+        return jsonify({"ok": False, "error": "Ingresá un monto mayor a 0."}), 400
+
+    payment_method = (data.get("payment_method") or "EFECTIVO").upper()
+    description = (data.get("description") or "").strip() or ("Ingreso manual" if movement_type == "INGRESO" else "Gasto / retiro")
+
+    mov = CashMovement(
+        session_id=active_session.id,
+        movement_type=movement_type,
+        payment_method=payment_method,
+        amount=amount,
+        description=description,
+    )
+    db.session.add(mov)
+    db.session.commit()
+    return jsonify({"ok": True, "session": active_session.to_dict(include_movements=True)})
+
+
+@app.route("/api/pos/cash/close", methods=["POST"])
+def api_pos_cash_close():
+    unauth = require_admin()
+    if unauth:
+        return unauth
+
+    active_session = CashSession.query.filter_by(status="OPEN").order_by(CashSession.id.desc()).first()
+    if not active_session:
+        return jsonify({"ok": False, "error": "No hay ninguna caja abierta."}), 400
+
+    data = request.get_json(silent=True) or {}
+    closing_amount = max(0, int(data.get("closing_amount") or 0))
+    notes = (data.get("notes") or "").strip()
+
+    summary = active_session.summary()
+    active_session.expected_cash = summary["expected_cash"]
+    active_session.closing_amount = closing_amount
+    if notes:
+        active_session.notes = (active_session.notes + " | " + notes).strip(" |")
+    active_session.status = "CLOSED"
+    active_session.closed_at = datetime.utcnow()
+
+    db.session.commit()
+    return jsonify({"ok": True, "session": active_session.to_dict(include_movements=True)})
+
+
+@app.route("/api/pos/stock-movement", methods=["POST"])
+def api_pos_stock_movement():
+    unauth = require_admin()
+    if unauth:
+        return unauth
+
+    data = request.get_json(silent=True) or {}
+    variant_id = int(data.get("variant_id") or 0)
+    delta = int(data.get("quantity_delta") or 0)
+    movement_type = (data.get("movement_type") or "INGRESO").upper()
+    reason = (data.get("reason") or "").strip()
+
+    if delta == 0:
+        return jsonify({"ok": False, "error": "La cantidad no puede ser 0."}), 400
+
+    variant = db.session.get(ProductVariant, variant_id)
+    if not variant:
+        return jsonify({"ok": False, "error": "Variante no encontrada."}), 404
+
+    if variant.stock + delta < 0:
+        return jsonify({"ok": False, "error": f"No podés descontar más del stock actual ({variant.stock})."}), 400
+
+    variant.stock += delta
+    record_stock_movement(
+        variant,
+        delta,
+        movement_type if movement_type in ("INGRESO", "AJUSTE", "DEVOLUCION") else "AJUSTE",
+        reason=reason or "Movimiento desde POS Local",
+    )
+    db.session.commit()
+    return jsonify({"ok": True, "variant": variant.to_dict()})
 
 
 if __name__ == "__main__":

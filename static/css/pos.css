@@ -1,0 +1,482 @@
+/* ==========================================================================
+   WHIP POS — Punto de Venta Local, Caja Diaria e Historial de Stock
+   ========================================================================== */
+
+.pos-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: rgba(10, 8, 5, 0.96);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+
+.pos-header-bar {
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pos-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.pos-status-pill.open {
+  border-color: rgba(34, 197, 94, 0.45);
+  background: rgba(34, 197, 94, 0.14);
+  color: #86efac;
+}
+
+.pos-status-pill.closed {
+  border-color: rgba(239, 68, 68, 0.45);
+  background: rgba(239, 68, 68, 0.14);
+  color: #fca5a5;
+}
+
+.pos-container {
+  max-width: 1420px;
+  margin: 0 auto;
+  padding: 18px 18px 60px;
+}
+
+/* Split layout: Catalog (left) + Ticket (right) */
+.pos-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(340px, 430px);
+  gap: 18px;
+  align-items: start;
+}
+
+/* Scanner & Search Bar */
+.scanner-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.scanner-input-wrap {
+  position: relative;
+  flex: 1;
+}
+
+.scanner-input-wrap span {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 16px;
+  pointer-events: none;
+}
+
+.scanner-input {
+  width: 100%;
+  height: 46px;
+  padding: 0 14px 0 42px;
+  border-radius: 11px;
+  border: 1.5px solid var(--border-strong);
+  background: #120e08;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.scanner-input:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.16);
+}
+
+.pos-brand-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 14px;
+}
+
+/* Product Grid */
+.pos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(225px, 1fr));
+  gap: 12px;
+}
+
+.pos-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.15s, transform 0.15s;
+}
+
+.pos-card:hover {
+  border-color: var(--border-strong);
+}
+
+.pos-card-top {
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  align-items: center;
+}
+
+.pos-card-thumb {
+  width: 64px;
+  height: 64px;
+  border-radius: 9px;
+  background: var(--card-media-bg);
+  flex-shrink: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+}
+
+.pos-card-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.pos-card-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.pos-card-brand {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.pos-card-name {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 2px 0 4px;
+  color: var(--ink);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.pos-card-price {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--gold);
+}
+
+.pos-variants {
+  padding: 0 10px 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pos-size-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 215, 0, 0.28);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.pos-size-btn:hover:not(:disabled) {
+  background: var(--gold);
+  color: #000;
+  border-color: var(--gold);
+}
+
+.pos-size-btn .st-qty {
+  font-size: 10.5px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: rgba(34, 197, 94, 0.18);
+  color: #86efac;
+}
+
+.pos-size-btn:hover:not(:disabled) .st-qty {
+  background: rgba(0, 0, 0, 0.18);
+  color: #000;
+}
+
+.pos-size-btn.low .st-qty {
+  background: rgba(245, 158, 11, 0.22);
+  color: #fcd34d;
+}
+
+.pos-size-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+
+/* Ticket / Cart Panel */
+.pos-ticket {
+  position: sticky;
+  top: 120px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+
+.pos-ticket-head {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 215, 0, 0.05);
+}
+
+.pos-ticket-items {
+  max-height: 290px;
+  overflow-y: auto;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pos-cart-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid rgba(255, 215, 0, 0.12);
+}
+
+.pos-cart-row-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.pos-cart-row-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pos-cart-row-sub {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.pos-qty-ctrl {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pos-qty-ctrl button {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: #120e08;
+  color: var(--ink);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.pos-qty-ctrl button:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.pos-ticket-controls {
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pos-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.pos-pay-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+.pos-choice-btn {
+  padding: 8px 6px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.12s;
+}
+
+.pos-choice-btn.active {
+  background: rgba(255, 215, 0, 0.16);
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.pos-totals {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #100d07;
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+}
+
+.pos-totals-row {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+}
+
+.pos-totals-grand {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-top: 6px;
+  margin-top: 4px;
+  border-top: 1px dashed var(--border);
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--gold);
+}
+
+/* Badges */
+.ch-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.ch-LOCAL { background: rgba(255, 215, 0, 0.18); color: #ffd700; }
+.ch-WEB { background: rgba(59, 130, 246, 0.18); color: #93c5fd; }
+.ch-WHATSAPP { background: rgba(34, 197, 94, 0.18); color: #86efac; }
+.ch-INSTAGRAM { background: rgba(236, 72, 153, 0.18); color: #f9a8d4; }
+
+.mov-pos { color: #86efac; font-weight: 800; }
+.mov-neg { color: #fca5a5; font-weight: 800; }
+
+/* Toast */
+.pos-toast {
+  position: fixed;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: #111;
+  border: 1.5px solid var(--gold);
+  color: var(--gold);
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 700;
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+  z-index: 999;
+}
+
+.pos-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.pos-toast.error {
+  border-color: var(--danger);
+  color: #fca5a5;
+}
+
+/* Printable Ticket (80mm Thermal friendly) */
+.receipt-box {
+  background: #ffffff;
+  color: #111111;
+  padding: 18px;
+  border-radius: 10px;
+  font-family: "Courier New", Courier, monospace;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.receipt-box h3 {
+  margin: 0;
+  text-align: center;
+  font-size: 16px;
+}
+
+.receipt-divider {
+  border-top: 1px dashed #333;
+  margin: 10px 0;
+}
+
+@media (max-width: 980px) {
+  .pos-split {
+    grid-template-columns: 1fr;
+  }
+  .pos-ticket {
+    position: static;
+  }
+}
+
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  #receiptPrintArea, #receiptPrintArea * {
+    visibility: visible !important;
+  }
+  #receiptPrintArea {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 80mm;
+    padding: 4mm;
+    background: #fff !important;
+    color: #000 !important;
+    box-shadow: none !important;
+  }
+}

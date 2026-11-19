@@ -1,0 +1,932 @@
+(function () {
+  const fmt = (n) => "$ " + Math.round(Number(n) || 0).toLocaleString("es-AR");
+
+  const state = {
+    products: [],
+    lowStock: [],
+    activeSession: null,
+    closedSessions: [],
+    recentSales: [],
+    recentMovements: [],
+    cart: [], // { variant_id, product_id, name, size, color, sku, price, stock, quantity }
+    selectedBrand: "TODAS",
+    salesFilter: "ALL",
+    channel: "LOCAL",
+    paymentMethod: "EFECTIVO",
+  };
+
+  function toast(msg, isError = false) {
+    const el = document.getElementById("posToast");
+    if (!el) return;
+    el.textContent = msg;
+    el.className = "pos-toast show" + (isError ? " error" : "");
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.classList.remove("show"), 2800);
+  }
+
+  // ---------------- LOGIN ----------------
+  const loginForm = document.getElementById("posLoginForm");
+  if (loginForm) {
+    loginForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = document.getElementById("posLoginEmail").value.trim();
+      const password = document.getElementById("posLoginPassword").value.trim();
+      const err = document.getElementById("posLoginError");
+      err.textContent = "";
+      try {
+        const res = await fetch("/api/admin/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          window.location.reload();
+        } else {
+          err.textContent = data.error || "Error de acceso";
+        }
+      } catch {
+        err.textContent = "Error de conexión.";
+      }
+    });
+    return;
+  }
+
+  // ---------------- STATE FETCH ----------------
+  async function loadState() {
+    try {
+      const res = await fetch("/api/pos/state");
+      if (res.status === 401) {
+        window.location.reload();
+        return;
+      }
+      const data = await res.json();
+      if (!data.ok) return;
+
+      state.products = data.products || [];
+      state.lowStock = data.low_stock || [];
+      state.activeSession = data.active_session || null;
+      state.closedSessions = data.closed_sessions || [];
+      state.recentSales = data.recent_sales || [];
+      state.recentMovements = data.recent_movements || [];
+
+      renderHeaderStatus();
+      renderBrands();
+      renderCatalog();
+      renderStockTab();
+      renderCart();
+      renderCashTab();
+      renderStockMovementsTab();
+      renderRecentSalesTab();
+    } catch (e) {
+      toast("No se pudo actualizar el estado del POS", true);
+    }
+  }
+
+  function renderHeaderStatus() {
+    const pill = document.getElementById("cashStatusPill");
+    const dot = document.getElementById("cashStatusDot");
+    const txt = document.getElementById("cashStatusText");
+    if (!pill) return;
+    if (state.activeSession) {
+      pill.className = "pos-status-pill open";
+      dot.textContent = "🟢";
+      txt.textContent = "Caja Abierta · " + fmt(state.activeSession.expected_cash);
+    } else {
+      pill.className = "pos-status-pill closed";
+      dot.textContent = "🔴";
+      txt.textContent = "Caja Cerrada (Abrir)";
+    }
+  }
+
+  // ---------------- CATALOG & SCANNER ----------------
+  function renderBrands() {
+    const wrap = document.getElementById("posBrandPills");
+    if (!wrap) return;
+    const activeProds = state.products.filter((p) => p.is_active);
+    const brands = ["TODAS", ...Array.from(new Set(activeProds.map((p) => p.brand))).sort()];
+    wrap.innerHTML = brands
+      .map(
+        (b) =>
+          `<button type="button" class="pill-btn ${state.selectedBrand === b ? "active" : ""}" onclick="window.WhipPOS.setBrand('${b.replace(/'/g, "\\'")}')">${b === "TODAS" ? "Todas las marcas" : b}</button>`
+      )
+      .join("");
+  }
+
+  function renderCatalog() {
+    const grid = document.getElementById("posCatalogGrid");
+    if (!grid) return;
+    const q = (document.getElementById("posScannerInput")?.value || "").trim().toLowerCase();
+
+    const filtered = state.products.filter((p) => {
+      if (!p.is_active) return false;
+      if (state.selectedBrand !== "TODAS" && p.brand !== state.selectedBrand) return false;
+      if (!q) return true;
+      const inMeta = p.name.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q);
+      const inSku = p.variants.some((v) => v.sku.toLowerCase().includes(q));
+      return inMeta || inSku;
+    });
+
+    if (!filtered.length) {
+      grid.innerHTML = `<div class="card-panel" style="grid-column:1/-1; padding:26px; text-align:center; color:var(--muted);">No se encontraron productos con ese filtro.</div>`;
+      return;
+    }
+
+    grid.innerHTML = filtered
+      .map((p) => {
+        const img = (p.images && p.images[0]) || "/static/images/cat-cascos.jpg";
+        const variantsHtml = p.variants
+          .map((v) => {
+            const disabled = v.stock <= 0 ? "disabled" : "";
+            const lowCls = v.stock > 0 && v.stock <= 2 ? "low" : "";
+            return `<button type="button" class="pos-size-btn ${lowCls}" ${disabled} title="SKU: ${v.sku}" onclick="window.WhipPOS.addVariant(${v.id})">
+              <span>${v.size}</span>
+              <span class="st-qty">${v.stock}</span>
+            </button>`;
+          })
+          .join("");
+
+        return `<article class="pos-card">
+          <div class="pos-card-top">
+            <div class="pos-card-thumb"><img src="${img}" alt="${p.name}"></div>
+            <div class="pos-card-info">
+              <div class="pos-card-brand">${p.brand}</div>
+              <div class="pos-card-name">${p.name}</div>
+              <div class="pos-card-price">${fmt(p.price)}</div>
+            </div>
+          </div>
+          <div class="pos-variants">${variantsHtml}</div>
+        </article>`;
+      })
+      .join("");
+  }
+
+  function findVariantLocally(variantId) {
+    for (const p of state.products) {
+      const v = p.variants.find((x) => x.id === variantId);
+      if (v) return { product: p, variant: v };
+    }
+    return null;
+  }
+
+  function addVariant(variantId) {
+    const found = findVariantLocally(variantId);
+    if (!found) return;
+    const { product, variant } = found;
+    if (variant.stock <= 0) {
+      toast("Sin stock disponible para " + product.name + " (" + variant.size + ")", true);
+      return;
+    }
+    const existing = state.cart.find((c) => c.variant_id === variant.id);
+    if (existing) {
+      if (existing.quantity >= variant.stock) {
+        toast("Stock máximo alcanzado (" + variant.stock + " u.)", true);
+        return;
+      }
+      existing.quantity += 1;
+    } else {
+      state.cart.push({
+        variant_id: variant.id,
+        product_id: product.id,
+        name: product.name,
+        size: variant.size,
+        color: variant.color,
+        sku: variant.sku,
+        price: product.price,
+        stock: variant.stock,
+        quantity: 1,
+      });
+    }
+    renderCart();
+    toast(`+1 ${product.name} (${variant.size})`);
+  }
+
+  async function scanLookup() {
+    const input = document.getElementById("posScannerInput");
+    const code = (input?.value || "").trim();
+    if (!code) return;
+    try {
+      const res = await fetch(`/api/pos/lookup?code=${encodeURIComponent(code)}`);
+      const data = await res.json();
+      if (data.ok && data.variant) {
+        addVariant(data.variant.id);
+        input.value = "";
+        renderCatalog();
+        input.focus();
+      } else {
+        toast(data.error || "SKU no encontrado", true);
+      }
+    } catch {
+      toast("Error buscando SKU", true);
+    }
+  }
+
+  const scannerInput = document.getElementById("posScannerInput");
+  if (scannerInput) {
+    scannerInput.addEventListener("input", renderCatalog);
+    scannerInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        scanLookup();
+      }
+    });
+  }
+
+  // ---------------- CART & CHECKOUT ----------------
+  function renderCart() {
+    const wrap = document.getElementById("posCartItems");
+    const countLabel = document.getElementById("posCartCountLabel");
+    if (!wrap) return;
+
+    const totalUnits = state.cart.reduce((acc, i) => acc + i.quantity, 0);
+    countLabel.textContent = `${totalUnits} ${totalUnits === 1 ? "ítem" : "ítems"}`;
+
+    if (!state.cart.length) {
+      wrap.innerHTML = `<div style="text-align:center; padding:28px 12px; color:var(--muted); font-size:13px;">Escaneá un SKU o tocá un talle para agregar productos al ticket.</div>`;
+    } else {
+      wrap.innerHTML = state.cart
+        .map(
+          (item) => `<div class="pos-cart-row">
+            <div class="pos-cart-row-info">
+              <div class="pos-cart-row-title">${item.name}</div>
+              <div class="pos-cart-row-sub">Talle ${item.size} · ${item.sku} · ${fmt(item.price)}</div>
+            </div>
+            <div class="pos-qty-ctrl">
+              <button type="button" onclick="window.WhipPOS.changeQty(${item.variant_id}, -1)">-</button>
+              <strong style="min-width:20px; text-align:center; font-size:13px;">${item.quantity}</strong>
+              <button type="button" onclick="window.WhipPOS.changeQty(${item.variant_id}, 1)">+</button>
+            </div>
+          </div>`
+        )
+        .join("");
+    }
+
+    const subtotal = state.cart.reduce((acc, i) => acc + i.price * i.quantity, 0);
+    const apply15 = Boolean(document.getElementById("posApplyTransferDiscount")?.checked);
+    const manualDesc = Math.max(0, parseInt(document.getElementById("posManualDiscount")?.value || "0", 10) || 0);
+    const auto15 = apply15 ? Math.round(subtotal * 0.15) : 0;
+    const discount = Math.min(subtotal, auto15 + manualDesc);
+    const total = Math.max(0, subtotal - discount);
+
+    document.getElementById("posSubtotal").textContent = fmt(subtotal);
+    document.getElementById("posDiscount").textContent = "-" + fmt(discount);
+    document.getElementById("posTotal").textContent = fmt(total);
+  }
+
+  function changeQty(variantId, delta) {
+    const idx = state.cart.findIndex((c) => c.variant_id === variantId);
+    if (idx === -1) return;
+    const item = state.cart[idx];
+    const next = item.quantity + delta;
+    if (next <= 0) {
+      state.cart.splice(idx, 1);
+    } else if (next > item.stock) {
+      toast("Stock máximo disponible: " + item.stock, true);
+      return;
+    } else {
+      item.quantity = next;
+    }
+    renderCart();
+  }
+
+  async function submitSale() {
+    if (!state.cart.length) {
+      toast("Agregá productos al ticket primero.", true);
+      return;
+    }
+    const btn = document.getElementById("posSubmitBtn");
+    btn.disabled = true;
+    btn.textContent = "Procesando venta...";
+
+    try {
+      const payload = {
+        items: state.cart.map((c) => ({ variant_id: c.variant_id, quantity: c.quantity, unit_price: c.price })),
+        channel: state.channel,
+        payment_method: state.paymentMethod,
+        apply_transfer_discount: Boolean(document.getElementById("posApplyTransferDiscount")?.checked),
+        discount_amount: parseInt(document.getElementById("posManualDiscount")?.value || "0", 10) || 0,
+        customer_name: document.getElementById("posCustomerName")?.value.trim() || "Cliente Mostrador",
+        customer_phone: document.getElementById("posCustomerPhone")?.value.trim() || "-",
+      };
+
+      const res = await fetch("/api/pos/sales", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        toast(data.error || "No se pudo registrar la venta", true);
+        return;
+      }
+
+      state.cart = [];
+      document.getElementById("posManualDiscount").value = "0";
+      document.getElementById("posCustomerName").value = "";
+      document.getElementById("posCustomerPhone").value = "";
+      document.getElementById("posApplyTransferDiscount").checked = false;
+
+      toast(`✅ Venta #${data.order.order_number} registrada` + (data.cash_recorded ? " y sumada a Caja" : ""));
+      openReceiptModal(data.order);
+      await loadState();
+    } catch {
+      toast("Error de conexión al cobrar.", true);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "✅ Cobrar y Descontar Stock";
+    }
+  }
+
+  function openReceiptModal(order) {
+    const area = document.getElementById("receiptPrintArea");
+    const waBtn = document.getElementById("receiptWhatsappBtn");
+    const itemsRows = (order.items || [])
+      .map(
+        (i) => `<div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+          <span>${i.quantity}x ${i.product_name}<br><small>${i.variant_label}</small></span>
+          <strong>${fmt(i.unit_price * i.quantity)}</strong>
+        </div>`
+      )
+      .join("");
+
+    area.innerHTML = `
+      <h3>WHIP HELMETS ARGENTINA</h3>
+      <div style="text-align:center; font-size:11px;">Comprobante interno de venta</div>
+      <div class="receipt-divider"></div>
+      <div><strong>Ticket:</strong> #${order.order_number}</div>
+      <div><strong>Fecha:</strong> ${order.created_at}</div>
+      <div><strong>Canal:</strong> ${order.channel} · <strong>Pago:</strong> ${order.payment_method}</div>
+      <div><strong>Cliente:</strong> ${order.customer_name}</div>
+      <div class="receipt-divider"></div>
+      ${itemsRows}
+      <div class="receipt-divider"></div>
+      <div style="display:flex; justify-content:space-between;"><span>Subtotal:</span><span>${fmt(order.subtotal)}</span></div>
+      ${order.discount_amount > 0 ? `<div style="display:flex; justify-content:space-between;"><span>Descuento:</span><span>-${fmt(order.discount_amount)}</span></div>` : ""}
+      <div style="display:flex; justify-content:space-between; font-size:16px; font-weight:800; margin-top:4px;"><span>TOTAL:</span><span>${fmt(order.total)}</span></div>
+      <div class="receipt-divider"></div>
+      <div style="text-align:center; font-size:11px;">¡Gracias por elegir Whip Store!<br>whip-helmets.com.ar</div>
+    `;
+
+    const waText = encodeURIComponent(
+      `🏍️ *Whip Store — Comprobante #${order.order_number}*\n` +
+        order.items.map((i) => `• ${i.quantity}x ${i.product_name} (${i.variant_label}) - ${fmt(i.unit_price * i.quantity)}`).join("\n") +
+        `\n\n*Total:* ${fmt(order.total)} (${order.payment_method})\n¡Gracias por tu compra!`
+    );
+    const cleanPhone = (order.customer_phone || "").replace(/\D/g, "");
+    waBtn.href = cleanPhone.length >= 8 ? `https://wa.me/549${cleanPhone}?text=${waText}` : `https://wa.me/?text=${waText}`;
+
+    document.getElementById("receiptModal").classList.add("open");
+  }
+
+  // ---------------- CAJA DIARIA ----------------
+  function renderCashTab() {
+    const openGate = document.getElementById("cashOpenGate");
+    const activeWrap = document.getElementById("cashActiveWrap");
+    if (!openGate || !activeWrap) return;
+
+    if (!state.activeSession) {
+      openGate.style.display = "block";
+      activeWrap.style.display = "none";
+    } else {
+      openGate.style.display = "none";
+      activeWrap.style.display = "block";
+
+      const s = state.activeSession;
+      const sum = s.summary;
+      const digitalTotal =
+        (sum.by_method.TRANSFERENCIA || 0) +
+        (sum.by_method.DEBITO || 0) +
+        (sum.by_method.CREDITO || 0) +
+        (sum.by_method.MERCADOPAGO || 0);
+
+      document.getElementById("cashOpenedAt").textContent = `· Desde ${s.opened_at}`;
+      document.getElementById("kpiCashExpected").textContent = fmt(s.expected_cash);
+      document.getElementById("kpiCashOpeningSub").textContent = `Apertura: ${fmt(s.opening_amount)} + Efectivo: ${fmt(sum.by_method.EFECTIVO || 0)}`;
+      document.getElementById("kpiCashSales").textContent = fmt(sum.sales_total);
+      document.getElementById("kpiCashSalesCount").textContent = `${sum.sales_count} ventas registradas`;
+      document.getElementById("kpiCashDigital").textContent = fmt(digitalTotal);
+      document.getElementById("kpiCashDigitalSub").textContent = `Transf: ${fmt(sum.by_method.TRANSFERENCIA || 0)} · Tarj/MP: ${fmt((sum.by_method.DEBITO || 0) + (sum.by_method.CREDITO || 0) + (sum.by_method.MERCADOPAGO || 0))}`;
+      document.getElementById("kpiCashOut").textContent = fmt(sum.cash_out);
+
+      const movBody = document.getElementById("cashMovementsBody");
+      const movs = s.movements || [];
+      movBody.innerHTML = movs.length
+        ? movs
+            .map((m) => {
+              const isOut = m.movement_type === "EGRESO";
+              return `<tr>
+                <td>${m.created_at}</td>
+                <td><span class="ch-badge ${isOut ? "" : "ch-WHATSAPP"}" style="${isOut ? "background:rgba(239,68,68,0.18);color:#fca5a5;" : ""}">${m.movement_type}</span></td>
+                <td>${m.payment_method}</td>
+                <td>${m.description}</td>
+                <td style="text-align:right;" class="${isOut ? "mov-neg" : "mov-pos"}">${isOut ? "-" : "+"}${fmt(m.amount)}</td>
+              </tr>`;
+            })
+            .join("")
+        : `<tr><td colspan="5" style="text-align:center; color:var(--muted); padding:20px;">Sin movimientos aún en este turno.</td></tr>`;
+    }
+
+    const closedBody = document.getElementById("closedSessionsBody");
+    closedBody.innerHTML = state.closedSessions.length
+      ? state.closedSessions
+          .map((c) => {
+            const diff = c.difference || 0;
+            const diffCls = diff === 0 ? "" : diff > 0 ? "mov-pos" : "mov-neg";
+            return `<tr>
+              <td>${c.opened_at}</td>
+              <td>${c.closed_at || "-"}</td>
+              <td>${fmt(c.summary.sales_total)} (${c.summary.sales_count})</td>
+              <td>${fmt(c.expected_cash)}</td>
+              <td>${fmt(c.closing_amount)}</td>
+              <td class="${diffCls}">${diff > 0 ? "+" : ""}${fmt(diff)}</td>
+            </tr>`;
+          })
+          .join("")
+      : `<tr><td colspan="6" style="text-align:center; color:var(--muted); padding:20px;">Todavía no hay cierres de caja registrados.</td></tr>`;
+  }
+
+  document.getElementById("openCashForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const opening_amount = parseInt(document.getElementById("cashOpeningAmount").value || "0", 10) || 0;
+    const notes = document.getElementById("cashOpeningNotes").value.trim();
+    const res = await fetch("/api/pos/cash/open", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ opening_amount, notes }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      toast("🟢 Caja abierta correctamente");
+      await loadState();
+    } else {
+      toast(data.error || "Error al abrir caja", true);
+    }
+  });
+
+  document.getElementById("cashMovementForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const movement_type = document.getElementById("cmType").value;
+    const amount = parseInt(document.getElementById("cmAmount").value || "0", 10) || 0;
+    const description = document.getElementById("cmDesc").value.trim();
+    const res = await fetch("/api/pos/cash/movement", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ movement_type, amount, description, payment_method: "EFECTIVO" }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      document.getElementById("cmAmount").value = "";
+      document.getElementById("cmDesc").value = "";
+      toast("Movimiento registrado en caja");
+      await loadState();
+    } else {
+      toast(data.error || "Error al registrar movimiento", true);
+    }
+  });
+
+  function openCloseCashModal() {
+    if (!state.activeSession) return;
+    document.getElementById("closeExpectedLabel").textContent = fmt(state.activeSession.expected_cash);
+    document.getElementById("closeCountedAmount").value = state.activeSession.expected_cash;
+    document.getElementById("closeNotes").value = "";
+    updateCloseDiff();
+    document.getElementById("closeCashModal").classList.add("open");
+  }
+
+  function updateCloseDiff() {
+    if (!state.activeSession) return;
+    const counted = parseInt(document.getElementById("closeCountedAmount").value || "0", 10) || 0;
+    const diff = counted - state.activeSession.expected_cash;
+    const lbl = document.getElementById("closeDiffLabel");
+    if (diff === 0) {
+      lbl.style.color = "#86efac";
+      lbl.textContent = "✅ Caja cuadrada ($ 0 diferencia)";
+    } else if (diff > 0) {
+      lbl.style.color = "#fcd34d";
+      lbl.textContent = `⚠️ Sobrante de ${fmt(diff)}`;
+    } else {
+      lbl.style.color = "#fca5a5";
+      lbl.textContent = `❌ Faltante de ${fmt(Math.abs(diff))}`;
+    }
+  }
+
+  document.getElementById("closeCashForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const closing_amount = parseInt(document.getElementById("closeCountedAmount").value || "0", 10) || 0;
+    const notes = document.getElementById("closeNotes").value.trim();
+    const res = await fetch("/api/pos/cash/close", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ closing_amount, notes }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      document.getElementById("closeCashModal").classList.remove("open");
+      toast("🔒 Caja cerrada y arqueo guardado");
+      await loadState();
+    } else {
+      toast(data.error || "Error al cerrar caja", true);
+    }
+  });
+
+  // ---------------- STOCK MOVEMENTS (KARDEX) ----------------
+  function renderStockMovementsTab() {
+    const sel = document.getElementById("smVariantSelect");
+    if (sel) {
+      const prev = sel.value;
+      const opts = [];
+      for (const p of state.products) {
+        for (const v of p.variants) {
+          opts.push(`<option value="${v.id}">${p.brand} ${p.name} — Talle ${v.size} [${v.sku}] (Stock: ${v.stock})</option>`);
+        }
+      }
+      sel.innerHTML = opts.join("");
+      if (prev) sel.value = prev;
+    }
+
+    const body = document.getElementById("stockMovementsBody");
+    if (!body) return;
+    body.innerHTML = state.recentMovements.length
+      ? state.recentMovements
+          .map((m) => {
+            const pos = m.quantity_delta > 0;
+            return `<tr>
+              <td>${m.created_at}</td>
+              <td><span class="ch-badge ${m.movement_type === "VENTA_WEB" ? "ch-WEB" : m.movement_type === "VENTA_LOCAL" ? "ch-LOCAL" : "ch-WHATSAPP"}">${m.movement_type}</span></td>
+              <td><strong>${m.product_name}</strong><div style="font-size:11.5px; color:var(--muted);">${m.variant_label}</div></td>
+              <td style="font-family:monospace; font-size:12px;">${m.sku}</td>
+              <td class="${pos ? "mov-pos" : "mov-neg"}">${pos ? "+" : ""}${m.quantity_delta}</td>
+              <td><strong>${m.stock_after}</strong></td>
+              <td style="color:var(--muted); font-size:12.5px;">${m.reason}</td>
+            </tr>`;
+          })
+          .join("")
+      : `<tr><td colspan="7" style="text-align:center; color:var(--muted); padding:24px;">Aún no hay movimientos de stock registrados.</td></tr>`;
+  }
+
+  document.getElementById("stockMovementForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const variant_id = parseInt(document.getElementById("smVariantSelect").value || "0", 10);
+    const movement_type = document.getElementById("smType").value;
+    let quantity_delta = parseInt(document.getElementById("smQty").value || "0", 10);
+    const reason = document.getElementById("smReason").value.trim();
+
+    if ((movement_type === "INGRESO" || movement_type === "DEVOLUCION") && quantity_delta < 0) {
+      quantity_delta = Math.abs(quantity_delta);
+    }
+
+    const res = await fetch("/api/pos/stock-movement", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ variant_id, movement_type, quantity_delta, reason }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      document.getElementById("smReason").value = "";
+      toast("✅ Stock actualizado y registrado en historial");
+      await loadState();
+    } else {
+      toast(data.error || "Error actualizando stock", true);
+    }
+  });
+
+  // ---------------- STOCK & PRODUCTS (UNIFICADO) ----------------
+  function renderStockTab() {
+    const badgeLow = document.getElementById("posBadgeLowStock");
+    if (badgeLow) badgeLow.textContent = state.lowStock.length ? `(${state.lowStock.length})` : "";
+
+    const lowCard = document.getElementById("posLowStockCard");
+    const lowBody = document.getElementById("posLowStockBody");
+    const lowCount = document.getElementById("posLowStockCount");
+    if (lowCard && lowBody) {
+      if (!state.lowStock.length) {
+        lowCard.style.display = "none";
+      } else {
+        lowCard.style.display = "block";
+        lowCount.textContent = `${state.lowStock.length} variantes con bajo stock`;
+        lowBody.innerHTML = state.lowStock
+          .slice(0, 12)
+          .map(
+            (x) => `<tr>
+              <td><strong>${x.product_name}</strong> <span style="font-size:11.5px; color:var(--muted);">(${x.brand})</span></td>
+              <td><strong>${x.size}</strong></td>
+              <td style="font-family:monospace; font-size:12px;">${x.sku}</td>
+              <td><span class="${x.stock === 0 ? "mov-neg" : ""}" style="${x.stock > 0 ? "color:#fcd34d;font-weight:800;" : ""}">${x.stock} u.</span></td>
+              <td style="text-align:right;">
+                <button type="button" class="btn btn-cta" style="height:28px; padding:0 10px; font-size:11.5px;" onclick="window.WhipPOS.quickRestock(${x.variant_id}, ${x.stock + 3})">+3 u.</button>
+              </td>
+            </tr>`
+          )
+          .join("");
+      }
+    }
+
+    const tbody = document.getElementById("posStockProductsBody");
+    if (!tbody) return;
+    const q = (document.getElementById("posStockSearch")?.value || "").trim().toLowerCase();
+    const list = state.products.filter((p) => {
+      if (!q) return true;
+      return (
+        p.name.toLowerCase().includes(q) ||
+        p.brand.toLowerCase().includes(q) ||
+        p.variants.some((v) => v.sku.toLowerCase().includes(q))
+      );
+    });
+
+    tbody.innerHTML = list.length
+      ? list
+          .map((p) => {
+            const img = (p.images && p.images[0]) || "/static/images/cat-cascos.jpg";
+            const variantsHtml = p.variants
+              .map(
+                (v) => `<div style="display:inline-flex; align-items:center; gap:4px; margin:2px 4px 2px 0; padding:3px 6px; border-radius:7px; background:var(--surface-2); border:1px solid var(--border); font-size:12px;">
+                  <strong style="min-width:20px;">${v.size}</strong>
+                  <button type="button" onclick="window.WhipPOS.setVariantStock(${v.id}, ${Math.max(0, v.stock - 1)})" style="width:22px;height:22px;border-radius:5px;border:1px solid var(--border);background:#120e08;color:#fff;cursor:pointer;">-</button>
+                  <span style="min-width:18px;text-align:center;font-weight:800;color:${v.stock === 0 ? "#fca5a5" : v.stock <= 2 ? "#fcd34d" : "#86efac"};">${v.stock}</span>
+                  <button type="button" onclick="window.WhipPOS.setVariantStock(${v.id}, ${v.stock + 1})" style="width:22px;height:22px;border-radius:5px;border:1px solid var(--border);background:#120e08;color:#fff;cursor:pointer;">+</button>
+                </div>`
+              )
+              .join("");
+
+            return `<tr>
+              <td>
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <img src="${img}" alt="" style="width:40px;height:40px;border-radius:7px;object-fit:contain;background:#f6f4ee;padding:2px;">
+                  <div>
+                    <div style="font-weight:700; font-size:13px;">${p.name}</div>
+                    <div style="font-size:11.5px; color:var(--muted);">${p.brand} · Total: ${p.total_stock} u.</div>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <input type="number" id="price-in-${p.id}" value="${p.price}" style="width:105px; height:32px; padding:0 8px; border-radius:7px; border:1px solid var(--border); background:#120e08; color:#ffd700; font-weight:700; font-size:12.5px;">
+                  <button type="button" class="btn btn-outline" style="height:32px; padding:0 8px; font-size:11px;" onclick="window.WhipPOS.savePrice(${p.id})">Guardar</button>
+                </div>
+              </td>
+              <td>${variantsHtml}</td>
+              <td>
+                <button type="button" class="ch-badge ${p.is_active ? "ch-WHATSAPP" : ""}" style="border:none; cursor:pointer; ${p.is_active ? "" : "background:rgba(239,68,68,0.18);color:#fca5a5;"}" onclick="window.WhipPOS.toggleActive(${p.id}, ${!p.is_active})">
+                  ${p.is_active ? "● Activo" : "○ Pausado"}
+                </button>
+              </td>
+              <td style="text-align:right;">
+                <button type="button" class="btn btn-outline" style="height:30px; padding:0 9px; font-size:11px; border-color:#ef4444; color:#fca5a5;" onclick="window.WhipPOS.deleteProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}')">Eliminar</button>
+              </td>
+            </tr>`;
+          })
+          .join("")
+      : `<tr><td colspan="5" style="text-align:center; padding:24px; color:var(--muted);">No se encontraron productos.</td></tr>`;
+  }
+
+  async function setVariantStock(variantId, newStock) {
+    const res = await fetch(`/api/admin/variant/${variantId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stock: newStock }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      toast(`Stock actualizado a ${data.variant.stock} u.`);
+      await loadState();
+    } else {
+      toast(data.error || "Error actualizando stock", true);
+    }
+  }
+
+  async function savePrice(productId) {
+    const val = parseInt(document.getElementById(`price-in-${productId}`)?.value || "0", 10);
+    if (val <= 0) return toast("Precio inválido", true);
+    const res = await fetch(`/api/admin/product/${productId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ price: val }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      toast("Precio actualizado en Local y Web");
+      await loadState();
+    } else {
+      toast(data.error || "Error actualizando precio", true);
+    }
+  }
+
+  async function toggleActive(productId, isActive) {
+    const res = await fetch(`/api/admin/product/${productId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ is_active: isActive }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      toast(isActive ? "Producto visible en la web" : "Producto pausado en la web");
+      await loadState();
+    }
+  }
+
+  async function deleteProduct(productId, name) {
+    if (!confirm(`¿Eliminar "${name}" de la base de datos?`)) return;
+    const res = await fetch(`/api/admin/product/${productId}`, { method: "DELETE" });
+    const data = await res.json();
+    if (data.ok) {
+      toast("Producto eliminado");
+      await loadState();
+    }
+  }
+
+  document.getElementById("posNewProductForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const payload = {
+      name: document.getElementById("pnpName").value.trim(),
+      brand: document.getElementById("pnpBrand").value.trim(),
+      category_slug: document.getElementById("pnpCategory").value,
+      price: parseInt(document.getElementById("pnpPrice").value || "0", 10),
+      color: document.getElementById("pnpColor").value.trim(),
+      stock_s: parseInt(document.getElementById("pnpStockS").value || "0", 10),
+      stock_m: parseInt(document.getElementById("pnpStockM").value || "0", 10),
+      stock_l: parseInt(document.getElementById("pnpStockL").value || "0", 10),
+      stock_xl: parseInt(document.getElementById("pnpStockXL").value || "0", 10),
+    };
+    const res = await fetch("/api/admin/products", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      document.getElementById("posNewProductModal").classList.remove("open");
+      document.getElementById("pnpName").value = "";
+      toast("✅ Producto creado y publicado en la tienda");
+      await loadState();
+    } else {
+      toast(data.error || "Error creando producto", true);
+    }
+  });
+
+  // ---------------- RECENT SALES & WEB ORDERS ----------------
+  function renderRecentSalesTab() {
+    const body = document.getElementById("recentSalesBody");
+    if (!body) return;
+
+    const pendingCount = state.recentSales.filter(
+      (o) => o.payment_status === "PENDING" || (o.payment_status === "PAID" && o.shipping_status !== "DELIVERED" && o.shipping_status !== "SHIPPED")
+    ).length;
+    const badgePending = document.getElementById("posBadgePending");
+    if (badgePending) badgePending.textContent = pendingCount ? `(${pendingCount})` : "";
+
+    const filtered = state.recentSales.filter((o) => {
+      const ch = o.channel || "WEB";
+      if (state.salesFilter === "LOCAL") return ch !== "WEB";
+      if (state.salesFilter === "WEB") return ch === "WEB";
+      if (state.salesFilter === "PENDING") return o.payment_status === "PENDING";
+      if (state.salesFilter === "TO_SHIP") return o.payment_status === "PAID" && o.shipping_status !== "DELIVERED" && o.shipping_status !== "SHIPPED";
+      return true;
+    });
+
+    body.innerHTML = filtered.length
+      ? filtered
+          .map((o) => {
+            const ch = o.channel || "WEB";
+            const itemsSummary = (o.items || []).map((i) => `${i.quantity}x ${i.product_name} (${i.variant_label})`).join(" · ");
+            return `<tr>
+              <td><strong>#${o.order_number}</strong></td>
+              <td>
+                <span class="ch-badge ch-${ch}">${ch}</span>
+                <div style="font-size:11px; color:var(--muted); margin-top:3px;">${o.created_at}</div>
+              </td>
+              <td>
+                <strong>${o.customer_name}</strong>
+                <div style="font-size:11.5px; color:var(--muted); max-width:260px;">${itemsSummary}</div>
+              </td>
+              <td>
+                <strong>${fmt(o.total)}</strong>
+                <div style="font-size:11px; color:var(--muted);">${o.payment_method}</div>
+              </td>
+              <td>
+                <select onchange="window.WhipPOS.updateOrderField(${o.id}, 'payment_status', this.value)" style="height:30px; border-radius:7px; border:1px solid var(--border); background:#120e08; color:#fff; font-size:12px; padding:0 6px;">
+                  <option value="PENDING" ${o.payment_status === "PENDING" ? "selected" : ""}>Pendiente</option>
+                  <option value="PAID" ${o.payment_status === "PAID" ? "selected" : ""}>Pagado</option>
+                  <option value="CANCELLED" ${o.payment_status === "CANCELLED" ? "selected" : ""}>Cancelado</option>
+                </select>
+              </td>
+              <td>
+                <div style="display:flex; flex-direction:column; gap:4px;">
+                  <select onchange="window.WhipPOS.updateOrderField(${o.id}, 'shipping_status', this.value)" style="height:28px; border-radius:7px; border:1px solid var(--border); background:#120e08; color:#fff; font-size:11.5px; padding:0 6px;">
+                    <option value="UNFULFILLED" ${o.shipping_status === "UNFULFILLED" ? "selected" : ""}>Sin preparar</option>
+                    <option value="PREPARING" ${o.shipping_status === "PREPARING" ? "selected" : ""}>Preparando</option>
+                    <option value="SHIPPED" ${o.shipping_status === "SHIPPED" ? "selected" : ""}>Enviado</option>
+                    <option value="DELIVERED" ${o.shipping_status === "DELIVERED" ? "selected" : ""}>Entregado</option>
+                  </select>
+                  ${ch === "WEB" ? `<div style="display:flex; gap:4px;">
+                    <input type="text" id="trk-${o.id}" value="${o.tracking_code || ""}" placeholder="Tracking..." style="width:110px; height:26px; font-size:11px; padding:0 6px; border-radius:6px; border:1px solid var(--border); background:#120e08; color:#fff;">
+                    <button type="button" class="btn btn-outline" style="height:26px; padding:0 6px; font-size:10.5px;" onclick="window.WhipPOS.saveTracking(${o.id})">OK</button>
+                  </div>` : ""}
+                </div>
+              </td>
+              <td style="text-align:right; white-space:nowrap;">
+                <button type="button" class="btn btn-outline" style="height:30px; padding:0 10px; font-size:11.5px;" onclick="window.WhipPOS.reprintOrder(${o.id})">🧾 Ticket</button>
+                ${!o.stock_restored ? `<button type="button" class="btn btn-outline" style="height:30px; padding:0 10px; font-size:11.5px; border-color:#ef4444; color:#fca5a5;" onclick="window.WhipPOS.cancelOrder(${o.id})">Anular</button>` : ""}
+              </td>
+            </tr>`;
+          })
+          .join("")
+      : `<tr><td colspan="7" style="text-align:center; color:var(--muted); padding:24px;">No hay ventas/pedidos para este filtro.</td></tr>`;
+  }
+
+  async function updateOrderField(orderId, field, value) {
+    const res = await fetch(`/api/admin/order/${orderId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [field]: value }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      toast("Pedido actualizado");
+      await loadState();
+    }
+  }
+
+  async function saveTracking(orderId) {
+    const val = document.getElementById(`trk-${orderId}`)?.value.trim() || "";
+    await updateOrderField(orderId, "tracking_code", val);
+  }
+
+  async function cancelOrder(orderId) {
+    if (!confirm("¿Anular esta venta y devolver las unidades al stock?")) return;
+    const res = await fetch(`/api/admin/order/${orderId}/restore-stock`, { method: "POST" });
+    const data = await res.json();
+    if (data.ok) {
+      toast("Venta anulada y stock reintegrado");
+      await loadState();
+    } else {
+      toast(data.error || "Error al anular", true);
+    }
+  }
+
+  // ---------------- PUBLIC API ----------------
+  window.WhipPOS = {
+    switchTab(name) {
+      document.querySelectorAll(".pos-tab-panel").forEach((el) => (el.style.display = "none"));
+      document.querySelectorAll(".admin-tab").forEach((el) => el.classList.toggle("active", el.dataset.tab === name));
+      const target = document.getElementById("pos-tab-" + name);
+      if (target) target.style.display = "block";
+      if (name === "mostrador") {
+        setTimeout(() => document.getElementById("posScannerInput")?.focus(), 50);
+      }
+    },
+    setBrand(b) {
+      state.selectedBrand = b;
+      renderBrands();
+      renderCatalog();
+    },
+    setChannel(ch, btn) {
+      state.channel = ch;
+      document.querySelectorAll("#posChannelGroup .pos-choice-btn").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+    },
+    setPayment(pm, btn) {
+      state.paymentMethod = pm;
+      document.querySelectorAll("#posPaymentGroup .pos-choice-btn").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      const chk = document.getElementById("posApplyTransferDiscount");
+      if (chk) chk.checked = pm === "TRANSFERENCIA";
+      renderCart();
+    },
+    addVariant,
+    scanLookup,
+    changeQty,
+    clearCart() {
+      state.cart = [];
+      renderCart();
+    },
+    renderCart,
+    submitSale,
+    openCloseCashModal,
+    updateCloseDiff,
+    reprintOrder(orderId) {
+      const o = state.recentSales.find((x) => x.id === orderId);
+      if (o) openReceiptModal(o);
+    },
+    renderStockTab,
+    quickRestock: setVariantStock,
+    setVariantStock,
+    savePrice,
+    toggleActive,
+    deleteProduct,
+    setSalesFilter(f, btn) {
+      state.salesFilter = f;
+      document.querySelectorAll(".sales-filter-btn").forEach((b) => b.classList.remove("active"));
+      if (btn) btn.classList.add("active");
+      renderRecentSalesTab();
+    },
+    updateOrderField,
+    saveTracking,
+    cancelOrder,
+    async logout() {
+      await fetch("/api/admin/logout", { method: "POST" });
+      window.location.reload();
+    },
+  };
+
+  loadState();
+})();
