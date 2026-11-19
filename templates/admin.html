@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel Administrador | Whip Store</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body style="background:#f8f9fa;">
+
+{% if not is_authed %}
+  <!-- LOGIN GATE -->
+  <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; padding:16px;">
+    <div class="card-panel" style="max-width:420px; width:100%; padding:30px;">
+      <div style="text-align:center; margin-bottom:22px;">
+        <div style="width:48px; height:48px; border-radius:12px; background:#111; color:#fff; display:flex; align-items:center; justify-content:center; margin:0 auto 10px; font-size:20px;">🔒</div>
+        <h1 style="margin:0; font-size:20px; font-weight:800;">Whip Store — Backoffice</h1>
+        <p style="margin:4px 0 0; font-size:12.5px; color:#6b7280;">Gestión de inventario real y pedidos (Python + SQLite/PostgreSQL)</p>
+      </div>
+
+      <form id="adminLoginForm" style="display:flex; flex-direction:column; gap:14px;">
+        <div id="loginError" style="color:#e63946; font-size:12.5px; font-weight:700;"></div>
+        <div class="field">
+          <label>Email</label>
+          <input type="email" id="loginEmail" value="admin@whip-helmets.com.ar" required>
+        </div>
+        <div class="field">
+          <label>Contraseña</label>
+          <input type="password" id="loginPassword" value="whip2026" required>
+        </div>
+        <button type="submit" class="btn btn-dark" style="width:100%;">Ingresar al Panel</button>
+      </form>
+
+      <div style="display:flex; justify-content:space-between; margin-top:18px; padding-top:14px; border-top:1px solid #f3f4f6; font-size:12px;">
+        <a href="/" style="color:#4b5563; font-weight:700;">← Volver a la tienda</a>
+        <span style="color:#9ca3af;">Credenciales precargadas</span>
+      </div>
+    </div>
+  </div>
+{% else %}
+  <!-- ADMIN HEADER -->
+  <header class="admin-header">
+    <div class="container" style="height:60px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <strong style="font-size:16px; letter-spacing:-0.02em;">WHIP ADMIN</strong>
+        <span class="badge badge-free" style="background:rgba(0,166,80,0.22); color:#6ee7b7;">BD Real Activa</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <a href="/" class="btn btn-ghost-light" style="height:34px; padding:0 12px; font-size:12px;">Ver tienda ↗</a>
+        <button type="button" onclick="window.WhipAdmin.logout()" class="btn btn-ghost-light" style="height:34px; padding:0 12px; font-size:12px;">Salir</button>
+      </div>
+    </div>
+    <div class="container admin-tabs">
+      <button type="button" class="admin-tab active" data-tab="dashboard" onclick="window.WhipAdmin.switchTab('dashboard')">📊 Resumen</button>
+      <button type="button" class="admin-tab" data-tab="productos" onclick="window.WhipAdmin.switchTab('productos')">📦 Productos y Stock <span id="tabCountProducts"></span></button>
+      <button type="button" class="admin-tab" data-tab="pedidos" onclick="window.WhipAdmin.switchTab('pedidos')">🛒 Pedidos <span id="tabCountOrders"></span></button>
+    </div>
+  </header>
+
+  <main class="container" style="padding:28px 18px 60px;">
+    <!-- PANEL 1: DASHBOARD -->
+    <section id="panel-dashboard" class="admin-panel">
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">Ventas Pagadas</div>
+          <div class="kpi-value" id="kpiSales">$ 0</div>
+          <div style="font-size:12px; color:#6b7280; margin-top:4px;" id="kpiSalesSub">—</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Pendientes de Envío</div>
+          <div class="kpi-value" id="kpiPending">0</div>
+          <div style="font-size:12px; color:#6b7280; margin-top:4px;">Listos para despachar</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Productos Activos</div>
+          <div class="kpi-value" id="kpiProducts">0</div>
+          <div style="font-size:12px; color:#6b7280; margin-top:4px;">Visibles en tienda</div>
+        </div>
+        <div class="kpi-card" style="border-color:#fde68a; background:#fffbeb;">
+          <div class="kpi-label" style="color:#b45309;">Alertas Bajo Stock</div>
+          <div class="kpi-value" style="color:#b45309;" id="kpiLowStock">0</div>
+          <div style="font-size:12px; color:#92400e; margin-top:4px;">Variantes con ≤ 2 unidades</div>
+        </div>
+      </div>
+
+      <div class="card-panel" style="padding:0; overflow:hidden;">
+        <div style="padding:16px 20px; border-bottom:1px solid #e5e7eb; display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <h2 style="margin:0; font-size:16px; font-weight:800;">Alertas de Reposición (Stock ≤ 2)</h2>
+            <p style="margin:2px 0 0; font-size:12px; color:#6b7280;">Sumá unidades en 1 clic y se actualiza en SQLite al instante.</p>
+          </div>
+          <button type="button" onclick="window.WhipAdmin.switchTab('productos')" style="background:none; border:none; color:#00A650; font-weight:800; font-size:12.5px; cursor:pointer;">Ir al inventario →</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="data-table">
+            <thead>
+              <tr><th>Producto</th><th>Talle</th><th>SKU</th><th>Stock</th><th style="text-align:right;">Reponer</th></tr>
+            </thead>
+            <tbody id="lowStockTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- PANEL 2: PRODUCTOS Y STOCK -->
+    <section id="panel-productos" class="admin-panel" style="display:none;">
+      <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+        <input type="text" id="adminProductSearch" placeholder="Buscar por nombre, marca o SKU..." style="height:40px; padding:0 14px; border-radius:9px; border:1px solid #e5e7eb; background:#fff; width:100%; max-width:380px; font-size:13.5px;">
+        <button type="button" class="btn btn-cta" style="height:40px; font-size:13px;" onclick="document.getElementById('newProductModal').classList.add('open')">+ Nuevo Producto</button>
+      </div>
+
+      <div class="card-panel" style="padding:0; overflow:hidden;">
+        <div style="overflow-x:auto;">
+          <table class="data-table">
+            <thead>
+              <tr><th>Producto</th><th>Precio (ARS)</th><th>Stock por Variante (Talle)</th><th>Estado</th><th style="text-align:right;">Acciones</th></tr>
+            </thead>
+            <tbody id="productsTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- PANEL 3: PEDIDOS -->
+    <section id="panel-pedidos" class="admin-panel" style="display:none;">
+      <div class="filter-pills">
+        <button type="button" class="pill-btn order-filter-btn active" onclick="window.WhipAdmin.setOrderFilter('ALL', this)">Todos</button>
+        <button type="button" class="pill-btn order-filter-btn" onclick="window.WhipAdmin.setOrderFilter('PENDING', this)">Pendiente de pago</button>
+        <button type="button" class="pill-btn order-filter-btn" onclick="window.WhipAdmin.setOrderFilter('PAID', this)">Pagado</button>
+        <button type="button" class="pill-btn order-filter-btn" onclick="window.WhipAdmin.setOrderFilter('CANCELLED', this)">Cancelado</button>
+      </div>
+      <div id="ordersListWrap"></div>
+    </section>
+  </main>
+
+  <!-- MODAL NUEVO PRODUCTO -->
+  <div class="modal-backdrop" id="newProductModal" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="modal-box">
+      <div class="cart-head">
+        <h2>Crear Nuevo Producto</h2>
+        <button type="button" onclick="document.getElementById('newProductModal').classList.remove('open')" style="background:none; border:none; font-size:20px; cursor:pointer;">✕</button>
+      </div>
+      <form id="newProductForm" style="padding:20px; display:flex; flex-direction:column; gap:12px;">
+        <div class="field">
+          <label>Nombre del producto *</label>
+          <input type="text" id="npName" required placeholder="Ej: Casco Fox V2 Pro Carbon">
+        </div>
+        <div class="form-grid">
+          <div class="field"><label>Marca</label><input type="text" id="npBrand" value="Fox"></div>
+          <div class="field">
+            <label>Categoría</label>
+            <select id="npCategory">
+              <option value="cascos">Cascos</option>
+              <option value="antiparras">Antiparras</option>
+              <option value="indumentaria">Indumentaria</option>
+              <option value="accesorios">Accesorios</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="field"><label>Precio (ARS)</label><input type="number" id="npPrice" value="350000" required></div>
+          <div class="field"><label>Color</label><input type="text" id="npColor" value="Negro Mate"></div>
+        </div>
+        <div class="form-grid">
+          <div class="field"><label>Stock inicial Talle M</label><input type="number" id="npStockM" value="3" min="0"></div>
+          <div class="field"><label>Stock inicial Talle L</label><input type="number" id="npStockL" value="2" min="0"></div>
+        </div>
+        <div style="display:flex; gap:10px; margin-top:6px;">
+          <button type="button" class="btn btn-outline" style="flex:1;" onclick="document.getElementById('newProductModal').classList.remove('open')">Cancelar</button>
+          <button type="submit" class="btn btn-cta" style="flex:1;">Guardar y Publicar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+{% endif %}
+
+<script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- HERO BANNER -->
+<section class="hero">
+  <img class="hero-bg" src="{{ url_for('static', filename='images/header-bg.jpg') }}" alt="Whip Store Motocross">
+  <div class="hero-overlay"></div>
+  <div class="container">
+    <div class="hero-content">
+      <span class="hero-pill">🛡️ Tienda Online Oficial · Stock Real en Argentina</span>
+      <h1>Tu próximo casco, en 6 cuotas sin interés.</h1>
+      <p>
+        Troy Lee Designs, Bell, Fox, Alpinestars y Airoh con stock verificado por talle,
+        15% OFF por transferencia bancaria y envío gratis a todo el país.
+      </p>
+      <div class="hero-btns">
+        <a href="#catalogo" class="btn btn-cta">COMPRAR AHORA →</a>
+        <a href="/categoria/ofertas" class="btn btn-ghost-light">Ver ofertas</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TRUST BADGES -->
+<section class="trust-bar">
+  <div class="container trust-grid">
+    <div class="trust-item">
+      <div class="trust-icon">🚚</div>
+      <div>
+        <h3>Envíos a todo el país</h3>
+        <p>Gratis desde $250.000 por Correo Argentino y Andreani</p>
+      </div>
+    </div>
+    <div class="trust-item">
+      <div class="trust-icon">💳</div>
+      <div>
+        <h3>Hasta 6 cuotas sin interés</h3>
+        <p>Pagos seguros con Mercado Pago y todas las tarjetas</p>
+      </div>
+    </div>
+    <div class="trust-item">
+      <div class="trust-icon">🏦</div>
+      <div>
+        <h3>15% OFF Transferencia</h3>
+        <p>Descuento directo aplicado automáticamente en el checkout</p>
+      </div>
+    </div>
+    <div class="trust-item">
+      <div class="trust-icon">🔄</div>
+      <div>
+        <h3>Cambio de talle garantizado</h3>
+        <p>15 días para cambiar tu casco sin vueltas</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DESTACADOS -->
+<section class="section">
+  <div class="container">
+    <div class="section-head">
+      <div>
+        <span class="section-eyebrow">Destacados</span>
+        <h2 class="section-title">Los más elegidos</h2>
+      </div>
+      <a href="/categoria/cascos" class="link-more">Ver todos →</a>
+    </div>
+
+    <div class="product-grid">
+      {% for product in featured_products %}
+        {% include "_product_card.html" %}
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- CATEGORY BANNERS -->
+<section style="padding: 8px 0 24px;">
+  <div class="container cat-banners">
+    {% for cat in categories %}
+      <a href="/categoria/{{ cat.slug }}" class="cat-banner">
+        <img src="{{ cat.image_url }}" alt="{{ cat.name }}">
+        <div class="cat-banner-content">
+          <h3>{{ cat.name }}</h3>
+          <p>{{ cat.description }}</p>
+          <span>Ver categoría →</span>
+        </div>
+      </a>
+    {% endfor %}
+  </div>
+</section>
+
+<!-- CATÁLOGO COMPLETO FILTRABLE -->
+<section class="section" id="catalogo">
+  <div class="container">
+    <div class="section-head">
+      <div>
+        <span class="section-eyebrow" style="color:#9ca3af;">Catálogo completo</span>
+        <h2 class="section-title">Stock disponible hoy</h2>
+      </div>
+      <div>
+        <select id="homeSortSelect" style="height:38px; padding:0 12px; border-radius:8px; border:1px solid #e5e7eb; font-size:12.5px; font-weight:700; background:#fff;">
+          <option value="featured">Ordenar: Destacados</option>
+          <option value="price-asc">Menor precio</option>
+          <option value="price-desc">Mayor precio</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="filter-pills" id="homeBrandPills">
+      <button type="button" class="pill-btn active" data-brand="Todas">Todas</button>
+      {% for brand in brands %}
+        <button type="button" class="pill-btn" data-brand="{{ brand }}">{{ brand }}</button>
+      {% endfor %}
+    </div>
+
+    <div class="product-grid" id="homeCatalogGrid">
+      {% for product in products %}
+        {% include "_product_card.html" %}
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- COMUNIDAD INSTAGRAM -->
+<section style="background:#f8f9fa; border-top:1px solid #e5e7eb; border-bottom:1px solid #e5e7eb; padding:48px 0;">
+  <div class="container" style="text-align:center;">
+    <span class="section-eyebrow" style="color:#6b7280;">📸 Comunidad Whip</span>
+    <h2 class="section-title">Riders en pista con @whiphelmets.ar</h2>
+    <p style="font-size:14px; color:#6b7280; margin:6px 0 28px;">Etiquetanos en tus historias y recibí un cupón para tu próxima compra.</p>
+    <div class="product-grid">
+      <img src="{{ url_for('static', filename='images/cat-cascos.jpg') }}" alt="Motocross" style="aspect-ratio:1/1; object-fit:cover; border-radius:12px;">
+      <img src="{{ url_for('static', filename='images/cat-gafas.jpg') }}" alt="Antiparras" style="aspect-ratio:1/1; object-fit:cover; border-radius:12px;">
+      <img src="{{ url_for('static', filename='images/cat-indumentaria.jpg') }}" alt="Indumentaria" style="aspect-ratio:1/1; object-fit:cover; border-radius:12px;">
+      <img src="{{ url_for('static', filename='images/header-bg.jpg') }}" alt="Track Day" style="aspect-ratio:1/1; object-fit:cover; border-radius:12px;">
+    </div>
+  </div>
+</section>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Filtrado por marca y ordenamiento instantáneo en la Home (JS puro)
+  (function () {
+    const grid = document.getElementById("homeCatalogGrid");
+    const pills = document.querySelectorAll("#homeBrandPills .pill-btn");
+    const sortSelect = document.getElementById("homeSortSelect");
+    if (!grid) return;
+
+    const allCards = Array.from(grid.children);
+    let currentBrand = "Todas";
+
+    function applyFilterAndSort() {
+      const sortVal = sortSelect.value;
+      const visible = allCards.filter((card) => {
+        const match = currentBrand === "Todas" || card.dataset.brand === currentBrand;
+        card.style.display = match ? "" : "none";
+        return match;
+      });
+
+      if (sortVal === "price-asc") {
+        visible.sort((a, b) => Number(a.dataset.price) - Number(b.dataset.price));
+      } else if (sortVal === "price-desc") {
+        visible.sort((a, b) => Number(b.dataset.price) - Number(a.dataset.price));
+      }
+      visible.forEach((el) => grid.appendChild(el));
+    }
+
+    pills.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        pills.forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        currentBrand = btn.dataset.brand;
+        applyFilterAndSort();
+      });
+    });
+
+    sortSelect?.addEventListener("change", applyFilterAndSort);
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+{% block title %}Finalizar compra | Whip Store{% endblock %}
+{% block content %}
+<div class="container" style="padding: 36px 18px 64px; max-width: 1100px;">
+  <div id="checkoutContainer">
+    <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:20px; border-bottom:1px solid #e5e7eb; margin-bottom:28px;">
+      <div>
+        <h1 style="margin:0; font-size:28px; font-weight:800;">Finalizar compra</h1>
+        <p style="margin:4px 0 0; font-size:13.5px; color:#6b7280;">Checkout rápido · Validación y descuento real de stock en base de datos</p>
+      </div>
+      <span class="stock-pill stock-ok">🔒 Sitio seguro SSL</span>
+    </div>
+
+    <form id="checkoutForm" class="checkout-grid">
+      <!-- IZQUIERDA -->
+      <div>
+        <div id="checkoutError" style="display:none; margin-bottom:16px; padding:12px 14px; border-radius:10px; background:#fef2f2; border:1px solid #fecaca; color:#e63946; font-size:13px; font-weight:700;"></div>
+
+        <div class="card-panel">
+          <h2 style="margin:0 0 16px; font-size:16px; font-weight:800;">1. Datos de contacto</h2>
+          <div class="form-grid">
+            <div class="field form-full">
+              <label>Nombre y Apellido *</label>
+              <input type="text" id="coName" required placeholder="Ej: Matías Abalo">
+            </div>
+            <div class="field">
+              <label>Email *</label>
+              <input type="email" id="coEmail" required placeholder="tu@email.com">
+            </div>
+            <div class="field">
+              <label>WhatsApp / Teléfono *</label>
+              <input type="tel" id="coPhone" required placeholder="+54 9 11 ...">
+            </div>
+          </div>
+        </div>
+
+        <div class="card-panel">
+          <h2 style="margin:0 0 16px; font-size:16px; font-weight:800;">2. Datos de envío</h2>
+          <div class="form-grid">
+            <div class="field form-full">
+              <label>Calle, altura y piso/depto *</label>
+              <input type="text" id="coAddress" required placeholder="Av. Santa Fe 2450, 4B">
+            </div>
+            <div class="field">
+              <label>Código Postal *</label>
+              <input type="text" id="coCp" required placeholder="1425">
+            </div>
+            <div class="field">
+              <label>Ciudad / Localidad *</label>
+              <input type="text" id="coCity" required placeholder="Palermo">
+            </div>
+            <div class="field form-full">
+              <label>Provincia *</label>
+              <select id="coProvince">
+                <option>Buenos Aires</option>
+                <option>CABA</option>
+                <option>Córdoba</option>
+                <option>Santa Fe</option>
+                <option>Mendoza</option>
+                <option>Neuquén</option>
+                <option>Tucumán</option>
+                <option>Salta</option>
+                <option>Entre Ríos</option>
+                <option>Otra provincia</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-panel">
+          <h2 style="margin:0 0 14px; font-size:16px; font-weight:800;">3. Medio de pago</h2>
+
+          <label class="pay-option selected" id="optTransfer">
+            <input type="radio" name="payMethod" value="TRANSFERENCIA" checked>
+            <div style="flex:1;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <strong style="font-size:14px;">🏦 Transferencia Bancaria</strong>
+                <span class="badge badge-free">15% OFF</span>
+              </div>
+              <p style="margin:4px 0 0; font-size:12px; color:#6b7280;">Te mostramos el Alias / CBU al confirmar y nos enviás el comprobante por WhatsApp.</p>
+            </div>
+          </label>
+
+          <label class="pay-option" id="optMp">
+            <input type="radio" name="payMethod" value="MERCADOPAGO">
+            <div style="flex:1;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <strong style="font-size:14px;">💳 Mercado Pago — Tarjetas</strong>
+                <span style="font-size:11.5px; font-weight:700; color:#4b5563;">6 cuotas sin interés</span>
+              </div>
+              <p style="margin:4px 0 0; font-size:12px; color:#6b7280;">Simulación Sandbox: aprueba el pago al instante y descuenta stock.</p>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- DERECHA: RESUMEN -->
+      <div class="card-panel" style="background:#f8f9fa; position:sticky; top:94px;">
+        <h2 style="margin:0 0 14px; font-size:16px; font-weight:800;">Resumen de tu pedido</h2>
+        <div id="coSummaryItems"></div>
+
+        <div style="border-top:1px solid #e5e7eb; padding-top:14px; margin-top:14px; font-size:13.5px; display:flex; flex-direction:column; gap:8px;">
+          <div style="display:flex; justify-content:space-between;">
+            <span style="color:#6b7280;">Subtotal</span>
+            <strong id="coSubtotal">$ 0</strong>
+          </div>
+          <div id="coDiscountRow" style="display:flex; justify-content:space-between; color:#00A650; font-weight:700;">
+            <span>Descuento Transferencia (15%)</span>
+            <span id="coDiscount">- $ 0</span>
+          </div>
+          <div style="display:flex; justify-content:space-between;">
+            <span style="color:#6b7280;">Envío</span>
+            <strong id="coShipping">GRATIS</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:baseline; padding-top:10px; border-top:1px solid #e5e7eb;">
+            <strong style="font-size:16px;">Total</strong>
+            <strong id="coTotal" style="font-size:22px;">$ 0</strong>
+          </div>
+        </div>
+
+        <button type="submit" id="coSubmitBtn" class="btn btn-cta" style="width:100%; height:50px; margin-top:18px;">
+          CONFIRMAR PEDIDO POR TRANSFERENCIA
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- PANTALLA DE CONFIRMACIÓN -->
+  <div id="checkoutSuccess" style="display:none; max-width:620px; margin:20px auto;"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    let paymentMethod = "TRANSFERENCIA";
+
+    function renderSummary() {
+      const cart = window.WhipStore.getCart();
+      const container = document.getElementById("checkoutContainer");
+      if (!cart.length) {
+        container.innerHTML = `
+          <div style="text-align:center; padding:64px 20px;">
+            <div style="font-size:44px; margin-bottom:10px;">🛍️</div>
+            <h1 style="margin:0 0 8px;">Tu carrito está vacío</h1>
+            <p style="color:#6b7280; margin:0 0 20px;">Agregá al menos un producto antes de iniciar la compra.</p>
+            <a href="/" class="btn btn-dark">Explorar catálogo</a>
+          </div>
+        `;
+        return;
+      }
+
+      document.getElementById("coSummaryItems").innerHTML = cart
+        .map(
+          (i) => `
+        <div style="display:flex; gap:10px; align-items:center; padding:8px 0; border-bottom:1px solid #e5e7eb;">
+          <img src="${i.image}" style="width:48px; height:48px; object-fit:contain; background:#fff; border:1px solid #e5e7eb; border-radius:7px; padding:3px;">
+          <div style="flex:1; min-width:0;">
+            <div style="font-size:12.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${i.name}</div>
+            <div style="font-size:11.5px; color:#6b7280;">Talle ${i.size} × ${i.quantity}</div>
+          </div>
+          <strong style="font-size:12.5px;">${window.WhipStore.formatARS(i.price * i.quantity)}</strong>
+        </div>
+      `
+        )
+        .join("");
+
+      const subtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+      const discount = paymentMethod === "TRANSFERENCIA" ? Math.round(subtotal * 0.15) : 0;
+      const shipping = subtotal >= window.WhipStore.FREE_SHIPPING_THRESHOLD ? 0 : 11500;
+      const total = Math.max(0, subtotal - discount + shipping);
+
+      document.getElementById("coSubtotal").textContent = window.WhipStore.formatARS(subtotal);
+      document.getElementById("coDiscountRow").style.display = discount > 0 ? "flex" : "none";
+      document.getElementById("coDiscount").textContent = "- " + window.WhipStore.formatARS(discount);
+      const shipEl = document.getElementById("coShipping");
+      shipEl.textContent = shipping === 0 ? "GRATIS" : window.WhipStore.formatARS(shipping);
+      shipEl.style.color = shipping === 0 ? "#00A650" : "#111";
+      document.getElementById("coTotal").textContent = window.WhipStore.formatARS(total);
+      document.getElementById("coSubmitBtn").textContent =
+        paymentMethod === "TRANSFERENCIA"
+          ? "CONFIRMAR PEDIDO POR TRANSFERENCIA"
+          : "PAGAR CON MERCADO PAGO";
+    }
+
+    document.querySelectorAll('input[name="payMethod"]').forEach((radio) => {
+      radio.addEventListener("change", () => {
+        paymentMethod = radio.value;
+        document.getElementById("optTransfer").classList.toggle("selected", paymentMethod === "TRANSFERENCIA");
+        document.getElementById("optMp").classList.toggle("selected", paymentMethod === "MERCADOPAGO");
+        renderSummary();
+      });
+    });
+
+    document.getElementById("checkoutForm")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const errBox = document.getElementById("checkoutError");
+      errBox.style.display = "none";
+
+      const cart = window.WhipStore.getCart();
+      const payload = {
+        customer_name: document.getElementById("coName").value,
+        customer_email: document.getElementById("coEmail").value,
+        customer_phone: document.getElementById("coPhone").value,
+        shipping_address: document.getElementById("coAddress").value,
+        postal_code: document.getElementById("coCp").value,
+        city: document.getElementById("coCity").value,
+        province: document.getElementById("coProvince").value,
+        payment_method: paymentMethod,
+        items: cart.map((i) => ({ variant_id: i.variant_id, quantity: i.quantity })),
+      };
+
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+
+      if (!data.ok) {
+        errBox.textContent = data.error || "No se pudo confirmar el pedido.";
+        errBox.style.display = "block";
+        return;
+      }
+
+      const ord = data.order;
+      window.WhipStore.clearCart();
+      document.getElementById("checkoutContainer").style.display = "none";
+      const box = document.getElementById("checkoutSuccess");
+      box.style.display = "block";
+
+      const waText = encodeURIComponent(
+        `¡Hola Whip Store! Acabo de realizar el pedido #${ord.order_number} por ${window.WhipStore.formatARS(ord.total)} y envío mi comprobante.`
+      );
+
+      box.innerHTML = `
+        <div class="card-panel" style="padding:30px;">
+          <div style="text-align:center;">
+            <div style="font-size:44px;">✅</div>
+            <span class="section-eyebrow">Pedido #${ord.order_number} confirmado</span>
+            <h1 style="margin:6px 0 8px; font-size:26px;">¡Gracias por tu compra, ${ord.customer_name.split(" ")[0]}!</h1>
+            <p style="font-size:13.5px; color:#6b7280; margin:0 0 22px;">El stock se descontó automáticamente de la base de datos.</p>
+          </div>
+          ${
+            ord.payment_method === "TRANSFERENCIA"
+              ? `
+            <div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:12px; padding:16px; margin-bottom:20px;">
+              <strong style="font-size:14px; color:#065f46;">🏦 Datos para transferir (15% OFF aplicado)</strong>
+              <div style="background:#fff; border:1px solid #a7f3d0; border-radius:8px; padding:12px; margin:10px 0; font-family:monospace; font-size:13px; line-height:1.7;">
+                <div><strong>Alias:</strong> WHIP.STORE.ARG</div>
+                <div><strong>CBU:</strong> 0000003100084512900412</div>
+                <div><strong>Monto exacto:</strong> ${window.WhipStore.formatARS(ord.total)}</div>
+              </div>
+              <a href="https://wa.me/5491100000000?text=${waText}" target="_blank" class="btn" style="width:100%; background:#25D366; color:#fff;">
+                💬 Enviar comprobante por WhatsApp
+              </a>
+            </div>
+          `
+              : `
+            <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:12px; padding:14px; margin-bottom:20px; font-size:13px; color:#1e3a8a;">
+              <strong>Pago aprobado (Simulación Mercado Pago):</strong> Tu pedido ya figura como <strong>PAGADO</strong> en el panel de administración.
+            </div>
+          `
+          }
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <a href="/" class="btn btn-dark" style="flex:1;">Volver a la tienda</a>
+            <a href="/admin" class="btn btn-outline" style="flex:1;">Ver pedido en /admin →</a>
+          </div>
+        </div>
+      `;
+    });
+
+    renderSummary();
+  })();
+</script>
+{% endblock %}

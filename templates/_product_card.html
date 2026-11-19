@@ -1,0 +1,53 @@
+{% set total_stock = product.total_stock %}
+{% set imgs = product.images_json or [] %}
+{% set has_second = imgs|length > 1 %}
+<article class="product-card" data-brand="{{ product.brand }}" data-price="{{ product.price }}">
+  <a href="/producto/{{ product.slug }}" class="card-media {{ 'has-second' if has_second else '' }}">
+    <div class="card-badges">
+      {% if total_stock == 0 %}
+        <span class="badge badge-out">Sin stock</span>
+      {% else %}
+        {% if product.discount_percent %}
+          <span class="badge badge-sale">{{ product.discount_percent }}% OFF</span>
+        {% endif %}
+        {% if product.price >= FREE_SHIPPING_THRESHOLD %}
+          <span class="badge badge-free">Envío gratis</span>
+        {% endif %}
+        {% if total_stock <= 2 %}
+          <span class="badge badge-low">Últimas unidades</span>
+        {% endif %}
+      {% endif %}
+    </div>
+
+    <img class="primary" src="{{ imgs[0] if imgs else '/static/images/cat-cascos.jpg' }}" alt="{{ product.name }}" style="{{ 'opacity:0.5; filter:grayscale(1);' if total_stock == 0 else '' }}">
+    {% if has_second %}
+      <img class="secondary" src="{{ imgs[1] }}" alt="{{ product.name }} vista lateral">
+    {% endif %}
+  </a>
+
+  <div class="card-body">
+    <span class="card-brand">{{ product.brand }}</span>
+    <a href="/producto/{{ product.slug }}" class="card-title">{{ product.name }}</a>
+
+    <div class="card-sizes">
+      {% for v in product.variants if v.stock > 0 %}
+        <span class="size-chip">{{ v.size }}</span>
+      {% endfor %}
+    </div>
+
+    <div class="card-pricing">
+      <div class="price-row">
+        <span class="price-main">{{ product.price|ars }}</span>
+        {% if product.compare_at_price and product.compare_at_price > product.price %}
+          <span class="price-old">{{ product.compare_at_price|ars }}</span>
+        {% endif %}
+      </div>
+      <p class="price-cuotas">💳 <strong>6 cuotas sin interés</strong> de {{ product.installment_price|ars }}</p>
+      <p class="price-transfer">🏦 {{ product.transfer_price|ars }} con Transferencia ({{ product.transfer_discount }}% OFF)</p>
+    </div>
+
+    <a href="/producto/{{ product.slug }}" class="card-cta {{ 'out' if total_stock == 0 else '' }}">
+      {{ 'Sin stock' if total_stock == 0 else 'Elegir talle' }}
+    </a>
+  </div>
+</article>
