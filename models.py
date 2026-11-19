@@ -25,6 +25,7 @@ class Product(db.Model):
     brand = db.Column(db.String(80), nullable=False)
     description = db.Column(db.Text, default="")
     price = db.Column(db.Integer, nullable=False)
+    cash_price = db.Column(db.Integer, nullable=True)  # Precio Efectivo / Transferencia
     compare_at_price = db.Column(db.Integer, nullable=True)
     transfer_discount = db.Column(db.Integer, default=15)
     is_active = db.Column(db.Boolean, default=True)
@@ -58,6 +59,8 @@ class Product(db.Model):
 
     @property
     def transfer_price(self):
+        if self.cash_price and self.cash_price > 0:
+            return self.cash_price
         return round(self.price * (1 - (self.transfer_discount or 15) / 100))
 
     def to_dict(self):
@@ -68,6 +71,7 @@ class Product(db.Model):
             "brand": self.brand,
             "description": self.description,
             "price": self.price,
+            "cash_price": self.cash_price,
             "compare_at_price": self.compare_at_price,
             "transfer_discount": self.transfer_discount,
             "transfer_price": self.transfer_price,

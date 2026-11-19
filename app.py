@@ -43,13 +43,18 @@ db.init_app(app)
 def ensure_schema_updates():
     """Agrega columnas nuevas a tablas existentes sin perder datos (SQLite / PostgreSQL)."""
     inspector = inspect(db.engine)
-    if "orders" in inspector.get_table_names():
+    tables = inspector.get_table_names()
+    if "orders" in tables:
         existing_cols = {c["name"] for c in inspector.get_columns("orders")}
         if "channel" not in existing_cols:
             db.session.execute(text("ALTER TABLE orders ADD COLUMN channel VARCHAR(20) DEFAULT 'WEB'"))
         if "notes" not in existing_cols:
             db.session.execute(text("ALTER TABLE orders ADD COLUMN notes VARCHAR(255) DEFAULT ''"))
-        db.session.commit()
+    if "products" in tables:
+        prod_cols = {c["name"] for c in inspector.get_columns("products")}
+        if "cash_price" not in prod_cols:
+            db.session.execute(text("ALTER TABLE products ADD COLUMN cash_price INTEGER"))
+    db.session.commit()
 
 
 def record_stock_movement(variant, delta, movement_type, reason="", order_id=None):
@@ -285,9 +290,12 @@ def api_checkout():
             order_items_to_create.append((variant, qty))
 
         payment_method = data["payment_method"]
-        discount_amount = (
-            round(subtotal * (TRANSFER_DISCOUNT_PCT / 100)) if payment_method == "TRANSFERENCIA" else 0
-        )
+        if payment_method == "TRANSFERENCIA":
+            discount_amount = sum(
+                max(0, (v.product.price - v.product.transfer_price)) * q for v, q in order_items_to_create
+            )
+        else:
+            discount_amount = 0
         shipping_cost = 0 if subtotal >= FREE_SHIPPING_THRESHOLD else 11500
         total = max(0, subtotal - discount_amount + shipping_cost)
 
@@ -486,6 +494,9 @@ def api_admin_product(product_id):
             product.description = str(data["description"] or "").strip()
         if "price" in data:
             product.price = max(0, int(data["price"]))
+        if "cash_price" in data:
+            cp = data["cash_price"]
+            product.cash_price = int(cp) if cp and int(cp) > 0 else None
         if "compare_at_price" in data:
             cap = data["compare_at_price"]
             product.compare_at_price = int(cap) if cap and int(cap) > 0 else None
@@ -571,6 +582,8 @@ def api_admin_create_product():
     cat_slug = (data.get("category_slug") or "cascos").strip()
     cat = Category.query.filter_by(slug=cat_slug).first() or Category.query.first()
     price = max(1000, int(data.get("price") or 350000))
+    cp_raw = data.get("cash_price")
+    cash_price = int(cp_raw) if cp_raw and int(cp_raw) > 0 else None
     color = (data.get("color") or "Negro Mate").strip()
     stock_s = max(0, int(data.get("stock_s") or 0))
     stock_m = max(0, int(data.get("stock_m") or 0))
@@ -587,6 +600,7 @@ def api_admin_create_product():
         brand=brand,
         category=cat,
         price=price,
+        cash_price=cash_price,
         transfer_discount=15,
         is_active=True,
         is_featured=True,
@@ -804,7 +818,11 @@ def api_pos_create_sale():
 
         manual_discount = max(0, int(data.get("discount_amount") or 0))
         apply_transfer_discount = bool(data.get("apply_transfer_discount", False))
-        auto_discount = round(subtotal * (TRANSFER_DISCOUNT_PCT / 100)) if apply_transfer_discount else 0
+        auto_discount = (
+            sum(max(0, (v.product.price - v.product.transfer_price)) * q for v, q, _ in order_items_to_create)
+            if apply_transfer_discount
+            else 0
+        )
         discount_amount = min(subtotal, manual_discount + auto_discount)
         total = max(0, subtotal - discount_amount)
 

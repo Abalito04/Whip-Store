@@ -155,6 +155,7 @@
               <div class="pos-card-brand">${p.brand}</div>
               <div class="pos-card-name">${p.name}</div>
               <div class="pos-card-price">${fmt(p.price)}</div>
+              <div style="font-size:11px; color:#86efac; font-weight:700;">Ef/Tr: ${fmt(p.transfer_price)}</div>
             </div>
           </div>
           <div class="pos-variants">${variantsHtml}</div>
@@ -195,6 +196,7 @@
         color: variant.color,
         sku: variant.sku,
         price: product.price,
+        transfer_price: product.transfer_price,
         stock: variant.stock,
         quantity: 1,
       });
@@ -264,10 +266,12 @@
     }
 
     const subtotal = state.cart.reduce((acc, i) => acc + i.price * i.quantity, 0);
-    const apply15 = Boolean(document.getElementById("posApplyTransferDiscount")?.checked);
+    const applyCashPrice = Boolean(document.getElementById("posApplyTransferDiscount")?.checked);
     const manualDesc = Math.max(0, parseInt(document.getElementById("posManualDiscount")?.value || "0", 10) || 0);
-    const auto15 = apply15 ? Math.round(subtotal * 0.15) : 0;
-    const discount = Math.min(subtotal, auto15 + manualDesc);
+    const autoCashDisc = applyCashPrice
+      ? state.cart.reduce((acc, i) => acc + Math.max(0, i.price - (i.transfer_price ?? i.price)) * i.quantity, 0)
+      : 0;
+    const discount = Math.min(subtotal, autoCashDisc + manualDesc);
     const total = Math.max(0, subtotal - discount);
 
     document.getElementById("posSubtotal").textContent = fmt(subtotal);
@@ -669,9 +673,16 @@
                 </div>
               </td>
               <td>
-                <div style="display:flex; align-items:center; gap:6px;">
-                  <input type="number" id="price-in-${p.id}" value="${p.price}" style="width:105px; height:32px; padding:0 8px; border-radius:7px; border:1px solid var(--border); background:#120e08; color:#ffd700; font-weight:700; font-size:12.5px;">
-                  <button type="button" class="btn btn-outline" style="height:32px; padding:0 8px; font-size:11px;" onclick="window.WhipPOS.savePrice(${p.id})">Guardar</button>
+                <div style="display:flex; flex-direction:column; gap:5px;">
+                  <div style="display:flex; align-items:center; gap:5px;">
+                    <span style="font-size:10.5px; color:var(--muted); min-width:38px;">Lista:</span>
+                    <input type="number" id="price-in-${p.id}" value="${p.price}" style="width:98px; height:28px; padding:0 7px; border-radius:6px; border:1px solid var(--border); background:#120e08; color:#ffd700; font-weight:700; font-size:12px;">
+                  </div>
+                  <div style="display:flex; align-items:center; gap:5px;">
+                    <span style="font-size:10.5px; color:#86efac; min-width:38px;">Ef/Tr:</span>
+                    <input type="number" id="cash-in-${p.id}" value="${p.cash_price || p.transfer_price}" style="width:98px; height:28px; padding:0 7px; border-radius:6px; border:1px solid rgba(34,197,94,0.35); background:#120e08; color:#86efac; font-weight:700; font-size:12px;">
+                    <button type="button" class="btn btn-outline" style="height:28px; padding:0 8px; font-size:11px;" onclick="window.WhipPOS.savePrice(${p.id})">Guardar</button>
+                  </div>
                 </div>
               </td>
               <td>${variantsHtml}</td>
@@ -728,18 +739,19 @@
 
   async function savePrice(productId) {
     const val = parseInt(document.getElementById(`price-in-${productId}`)?.value || "0", 10);
-    if (val <= 0) return toast("Precio inválido", true);
+    const cashVal = parseInt(document.getElementById(`cash-in-${productId}`)?.value || "0", 10) || null;
+    if (val <= 0) return toast("Precio lista inválido", true);
     const res = await fetch(`/api/admin/product/${productId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ price: val }),
+      body: JSON.stringify({ price: val, cash_price: cashVal }),
     });
     const data = await res.json();
     if (data.ok) {
-      toast("Precio actualizado en Local y Web");
+      toast("Precios actualizados en Local y Web");
       await loadState();
     } else {
-      toast(data.error || "Error actualizando precio", true);
+      toast(data.error || "Error actualizando precios", true);
     }
   }
 
@@ -812,8 +824,8 @@
     document.getElementById("epBrand").value = p.brand || "";
     document.getElementById("epCategory").value = p.category_slug || "cascos";
     document.getElementById("epPrice").value = p.price || 0;
+    document.getElementById("epCashPrice").value = p.cash_price || p.transfer_price || "";
     document.getElementById("epComparePrice").value = p.compare_at_price || "";
-    document.getElementById("epTransferDiscount").value = p.transfer_discount ?? 15;
     document.getElementById("epIsActive").checked = Boolean(p.is_active);
     document.getElementById("epIsFeatured").checked = Boolean(p.is_featured);
     document.getElementById("epDescription").value = p.description || "";
@@ -885,8 +897,8 @@
       brand: document.getElementById("epBrand").value.trim(),
       category_slug: document.getElementById("epCategory").value,
       price: parseInt(document.getElementById("epPrice").value || "0", 10) || 0,
+      cash_price: parseInt(document.getElementById("epCashPrice").value || "0", 10) || null,
       compare_at_price: parseInt(document.getElementById("epComparePrice").value || "0", 10) || null,
-      transfer_discount: parseInt(document.getElementById("epTransferDiscount").value || "15", 10) || 0,
       is_active: document.getElementById("epIsActive").checked,
       is_featured: document.getElementById("epIsFeatured").checked,
       description: document.getElementById("epDescription").value.trim(),
@@ -923,6 +935,7 @@
       brand: document.getElementById("pnpBrand").value.trim(),
       category_slug: document.getElementById("pnpCategory").value,
       price: parseInt(document.getElementById("pnpPrice").value || "0", 10),
+      cash_price: parseInt(document.getElementById("pnpCashPrice").value || "0", 10) || null,
       color: document.getElementById("pnpColor").value.trim(),
       stock_s: parseInt(document.getElementById("pnpStockS").value || "0", 10),
       stock_m: parseInt(document.getElementById("pnpStockM").value || "0", 10),
@@ -1071,7 +1084,7 @@
       document.querySelectorAll("#posPaymentGroup .pos-choice-btn").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       const chk = document.getElementById("posApplyTransferDiscount");
-      if (chk) chk.checked = pm === "TRANSFERENCIA";
+      if (chk) chk.checked = pm === "EFECTIVO" || pm === "TRANSFERENCIA";
       renderCart();
     },
     addVariant,

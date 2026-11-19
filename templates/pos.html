@@ -130,8 +130,8 @@
             </div>
 
             <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--ink); cursor:pointer;">
-              <input type="checkbox" id="posApplyTransferDiscount" onchange="window.WhipPOS.renderCart()">
-              <span>Aplicar <strong>15% OFF</strong> (Efectivo / Transferencia)</span>
+              <input type="checkbox" id="posApplyTransferDiscount" checked onchange="window.WhipPOS.renderCart()">
+              <span>Usar <strong>Precio Efectivo / Transferencia</strong></span>
             </label>
 
             <div class="form-grid" style="gap:8px;">
@@ -181,7 +181,7 @@
         <div style="overflow-x:auto;">
           <table class="data-table">
             <thead>
-              <tr><th>Producto</th><th>Precio (ARS)</th><th>Stock por Talle (en vivo con la web)</th><th>Visible en Web</th><th style="text-align:right;">Acciones</th></tr>
+              <tr><th>Producto</th><th>Precios (Lista / Efec-Transf)</th><th>Stock por Talle (en vivo con la web)</th><th>Visible en Web</th><th style="text-align:right;">Acciones</th></tr>
             </thead>
             <tbody id="posStockProductsBody"></tbody>
           </table>
@@ -390,9 +390,10 @@
           </div>
         </div>
         <div class="form-grid">
-          <div class="field"><label>Precio (ARS)</label><input type="number" id="pnpPrice" value="350000" required></div>
-          <div class="field"><label>Color</label><input type="text" id="pnpColor" value="Negro Mate"></div>
+          <div class="field"><label>Precio Lista / Tarjetas (ARS) *</label><input type="number" id="pnpPrice" value="350000" required></div>
+          <div class="field"><label>Precio Efectivo / Transf. (ARS)</label><input type="number" id="pnpCashPrice" placeholder="Auto -15% si vacío"></div>
         </div>
+        <div class="field"><label>Color</label><input type="text" id="pnpColor" value="Negro Mate"></div>
         <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px;">
           <div class="field"><label>Stock S</label><input type="number" id="pnpStockS" value="1" min="0"></div>
           <div class="field"><label>Stock M</label><input type="number" id="pnpStockM" value="3" min="0"></div>
@@ -433,9 +434,9 @@
           </div>
         </div>
         <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px;">
-          <div class="field"><label>Precio (ARS) *</label><input type="number" id="epPrice" min="0" required></div>
-          <div class="field"><label>Precio tachado (opcional)</label><input type="number" id="epComparePrice" min="0" placeholder="Sin oferta"></div>
-          <div class="field"><label>Desc. Transf. (%)</label><input type="number" id="epTransferDiscount" min="0" max="90" value="15"></div>
+          <div class="field"><label>Precio Lista / Tarjetas *</label><input type="number" id="epPrice" min="0" required></div>
+          <div class="field"><label>Precio Efectivo / Transf.</label><input type="number" id="epCashPrice" min="0" placeholder="Auto -15% si vacío"></div>
+          <div class="field"><label>Precio tachado (oferta)</label><input type="number" id="epComparePrice" min="0" placeholder="Sin oferta"></div>
         </div>
         <div style="display:flex; gap:18px; flex-wrap:wrap; font-size:13px;">
           <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
@@ -534,6 +535,6 @@
   <div id="posToast" class="pos-toast"></div>
 {% endif %}
 
-<script src="{{ url_for('static', filename='js/pos.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/pos.js') }}?v=5"></script>
 </body>
 </html>
