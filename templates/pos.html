@@ -166,22 +166,6 @@
 
     <!-- TAB 2: STOCK Y PRODUCTOS (GESTIÓN COMPLETA WEB + LOCAL) -->
     <section id="pos-tab-stock" class="pos-tab-panel" style="display:none;">
-      <div id="posLowStockCard" class="card-panel" style="padding:0; overflow:hidden; margin-bottom:18px; border-color:rgba(255,215,0,0.42);">
-        <div style="padding:12px 18px; border-bottom:1px solid var(--border); background:rgba(255,215,0,0.08); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-          <div>
-            <strong style="color:#ffd700; font-size:14.5px;">⚠️ Alertas de Bajo Stock (≤ 2 unidades)</strong>
-            <span style="font-size:12px; color:var(--muted); margin-left:8px;">Reponé en 1 clic y se actualiza al instante en la web</span>
-          </div>
-          <span id="posLowStockCount" style="font-size:12px; font-weight:800; color:#ffd700;"></span>
-        </div>
-        <div style="overflow-x:auto;">
-          <table class="data-table">
-            <thead><tr><th>Producto</th><th>Talle</th><th>SKU</th><th>Stock</th><th style="text-align:right;">Reposición Rápida</th></tr></thead>
-            <tbody id="posLowStockBody"></tbody>
-          </table>
-        </div>
-      </div>
-
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:14px;">
         <input
           type="text"
@@ -193,7 +177,7 @@
         <button type="button" class="btn btn-cta" style="height:40px; font-size:13px;" onclick="document.getElementById('posNewProductModal').classList.add('open')">+ Nuevo Producto</button>
       </div>
 
-      <div class="card-panel" style="padding:0; overflow:hidden;">
+      <div class="card-panel" style="padding:0; overflow:hidden; margin-bottom:18px;">
         <div style="overflow-x:auto;">
           <table class="data-table">
             <thead>
@@ -203,6 +187,25 @@
           </table>
         </div>
       </div>
+
+      <details id="posLowStockCard" class="card-panel" style="padding:0; overflow:hidden; border-color:rgba(255,215,0,0.42);">
+        <summary style="padding:14px 18px; background:rgba(255,215,0,0.08); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; cursor:pointer; list-style:none;">
+          <div>
+            <strong style="color:#ffd700; font-size:14.5px;">⚠️ Alertas de Bajo Stock (≤ 2 unidades)</strong>
+            <span style="font-size:12px; color:var(--muted); margin-left:8px;">Tocá para desplegar y reponer en 1 clic</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span id="posLowStockCount" style="font-size:12px; font-weight:800; color:#ffd700;"></span>
+            <span style="font-size:12px; color:var(--muted); font-weight:700;">Desplegar ▾</span>
+          </div>
+        </summary>
+        <div style="overflow-x:auto; border-top:1px solid var(--border);">
+          <table class="data-table">
+            <thead><tr><th>Producto</th><th>Talle</th><th>SKU</th><th>Stock</th><th style="text-align:right;">Reposición Rápida</th></tr></thead>
+            <tbody id="posLowStockBody"></tbody>
+          </table>
+        </div>
+      </details>
     </section>
 
     <!-- TAB 3: CAJA DIARIA -->
