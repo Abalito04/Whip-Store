@@ -15,17 +15,17 @@
   </div>
 
   <!-- Filtros -->
-  <form method="GET" style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; padding:16px 0; border-bottom:1px solid #f3f4f6; margin-bottom:24px;">
+  <form method="GET" style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; padding:16px 0; border-bottom:1px solid rgba(255,215,0,0.16); margin-bottom:24px;">
     <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
-      <strong style="font-size:12.5px; color:#4b5563;">Filtros:</strong>
-      <select name="marca" onchange="this.form.submit()" style="height:36px; padding:0 10px; border-radius:8px; border:1px solid #e5e7eb; font-size:12.5px; font-weight:700;">
+      <strong style="font-size:12.5px; color:#b8b0a0;">Filtros:</strong>
+      <select name="marca" onchange="this.form.submit()" style="height:36px; padding:0 10px; border-radius:8px; border:1px solid rgba(255,215,0,0.28); background:#17130c; color:#fff; font-size:12.5px; font-weight:700;">
         <option value="">Marca: Todas</option>
         {% for b in brands %}
           <option value="{{ b }}" {{ 'selected' if selected_brand == b else '' }}>{{ b }}</option>
         {% endfor %}
       </select>
 
-      <select name="talle" onchange="this.form.submit()" style="height:36px; padding:0 10px; border-radius:8px; border:1px solid #e5e7eb; font-size:12.5px; font-weight:700;">
+      <select name="talle" onchange="this.form.submit()" style="height:36px; padding:0 10px; border-radius:8px; border:1px solid rgba(255,215,0,0.28); background:#17130c; color:#fff; font-size:12.5px; font-weight:700;">
         <option value="">Talle: Todos</option>
         {% for s in sizes %}
           <option value="{{ s }}" {{ 'selected' if selected_size == s else '' }}>Talle {{ s }}</option>
@@ -33,7 +33,7 @@
       </select>
     </div>
 
-    <select name="orden" onchange="this.form.submit()" style="height:36px; padding:0 10px; border-radius:8px; border:1px solid #e5e7eb; font-size:12.5px; font-weight:700;">
+    <select name="orden" onchange="this.form.submit()" style="height:36px; padding:0 10px; border-radius:8px; border:1px solid rgba(255,215,0,0.28); background:#17130c; color:#fff; font-size:12.5px; font-weight:700;">
       <option value="featured" {{ 'selected' if sort_by == 'featured' else '' }}>Ordenar: Destacados</option>
       <option value="price-asc" {{ 'selected' if sort_by == 'price-asc' else '' }}>Precio: Menor a mayor</option>
       <option value="price-desc" {{ 'selected' if sort_by == 'price-desc' else '' }}>Precio: Mayor a menor</option>
@@ -41,10 +41,10 @@
   </form>
 
   {% if products|length == 0 %}
-    <div style="text-align:center; padding:56px 20px; background:#f8f9fa; border:1px solid #e5e7eb; border-radius:16px;">
-      <h2 style="margin:0 0 8px; font-size:18px;">No encontramos productos con esos filtros</h2>
-      <p style="margin:0 0 20px; font-size:13.5px; color:#6b7280;">Probá limpiar los filtros o ver todos los cascos disponibles.</p>
-      <a href="/categoria/{{ slug }}" class="btn btn-dark">Limpiar filtros</a>
+    <div style="text-align:center; padding:56px 20px; background:#17130c; border:1px solid rgba(255,215,0,0.22); border-radius:16px;">
+      <h2 style="margin:0 0 8px; font-size:18px; color:#ffd700;">No encontramos productos con esos filtros</h2>
+      <p style="margin:0 0 20px; font-size:13.5px; color:#b8b0a0;">Probá limpiar los filtros o ver todos los cascos disponibles.</p>
+      <a href="/categoria/{{ slug }}" class="btn btn-cta">Limpiar filtros</a>
     </div>
   {% else %}
     <div class="product-grid">
