@@ -1,6 +1,7 @@
 {% set total_stock = product.total_stock %}
 {% set imgs = product.images_json or [] %}
 {% set has_second = imgs|length > 1 %}
+{% set in_stock_variants = product.variants | selectattr('stock', 'gt', 0) | list %}
 <article class="product-card" data-brand="{{ product.brand }}" data-price="{{ product.price }}">
   <a href="/producto/{{ product.slug }}" class="card-media {{ 'has-second' if has_second else '' }}">
     <div class="card-badges">
@@ -29,12 +30,6 @@
     <span class="card-brand">{{ product.brand }}</span>
     <a href="/producto/{{ product.slug }}" class="card-title">{{ product.name }}</a>
 
-    <div class="card-sizes">
-      {% for v in product.variants if v.stock > 0 %}
-        <span class="size-chip">{{ v.size }}</span>
-      {% endfor %}
-    </div>
-
     <div class="card-pricing">
       <div class="price-row">
         <span class="price-main">{{ product.price|ars }}</span>
@@ -46,8 +41,39 @@
       <p class="price-transfer">🏦 {{ product.transfer_price|ars }} con Transferencia ({{ product.transfer_discount }}% OFF)</p>
     </div>
 
-    <a href="/producto/{{ product.slug }}" class="card-cta {{ 'out' if total_stock == 0 else '' }}">
-      {{ 'Sin stock' if total_stock == 0 else 'Elegir talle' }}
-    </a>
+    {% if in_stock_variants|length > 0 %}
+      <div class="card-size-picker">
+        <span class="card-size-label">Talle:</span>
+        <div class="card-sizes">
+          {% for v in in_stock_variants %}
+            <button
+              type="button"
+              class="size-chip-btn {{ 'active' if loop.first else '' }}"
+              data-variant-id="{{ v.id }}"
+              data-size="{{ v.size }}"
+              data-color="{{ v.color }}"
+              data-stock="{{ v.stock }}"
+              onclick="window.WhipStore.selectCardSize(this)"
+            >{{ v.size }}</button>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="card-actions">
+        <button
+          type="button"
+          class="card-cta"
+          data-product-id="{{ product.id }}"
+          data-name="{{ product.name }}"
+          data-slug="{{ product.slug }}"
+          data-price="{{ product.price }}"
+          data-image="{{ imgs[0] if imgs else '/static/images/cat-cascos.jpg' }}"
+          onclick="window.WhipStore.quickAddFromCard(this)"
+        >🛍️ Agregar al carrito</button>
+        <a href="/producto/{{ product.slug }}" class="card-size-link">Ver detalle</a>
+      </div>
+    {% else %}
+      <a href="/producto/{{ product.slug }}" class="card-cta out">Sin stock</a>
+    {% endif %}
   </div>
 </article>

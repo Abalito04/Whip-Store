@@ -266,6 +266,36 @@
     closeBtn?.addEventListener("click", close);
   }
 
+  function selectCardSize(btn) {
+    const card = btn.closest(".product-card");
+    if (!card) return;
+    card.querySelectorAll(".size-chip-btn").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+  }
+
+  function quickAddFromCard(btn) {
+    const card = btn.closest(".product-card");
+    const activeSizeBtn = card?.querySelector(".size-chip-btn.active");
+    if (!activeSizeBtn) return;
+
+    const res = addToCart({
+      product_id: Number(btn.dataset.productId),
+      variant_id: Number(activeSizeBtn.dataset.variantId),
+      name: btn.dataset.name,
+      slug: btn.dataset.slug,
+      size: activeSizeBtn.dataset.size,
+      color: activeSizeBtn.dataset.color,
+      price: Number(btn.dataset.price),
+      image: btn.dataset.image,
+      max_stock: Number(activeSizeBtn.dataset.stock),
+      quantity: 1,
+    });
+
+    if (!res.ok && res.error) {
+      alert(res.error);
+    }
+  }
+
   window.WhipStore = {
     formatARS,
     getCart,
@@ -275,6 +305,8 @@
     clearCart,
     openCart,
     closeCart,
+    selectCardSize,
+    quickAddFromCard,
     FREE_SHIPPING_THRESHOLD,
     TRANSFER_DISCOUNT_PCT,
   };

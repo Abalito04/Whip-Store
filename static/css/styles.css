@@ -614,22 +614,6 @@ button, input, select {
 }
 .card-title:hover { color: var(--gold); }
 
-.card-sizes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 8px;
-}
-.size-chip {
-  padding: 2px 6px;
-  font-size: 10px;
-  font-weight: 700;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 215, 0, 0.22);
-  color: #e5e0d5;
-}
-
 .card-pricing {
   margin-top: 12px;
   padding-top: 10px;
@@ -642,9 +626,52 @@ button, input, select {
 .price-cuotas { font-size: 11.5px; color: var(--muted); margin: 4px 0 0; }
 .price-transfer { font-size: 11.5px; font-weight: 800; color: var(--gold); margin: 3px 0 0; }
 
+.card-size-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.card-size-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.card-sizes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.size-chip-btn {
+  padding: 2px 7px;
+  font-size: 10.5px;
+  font-weight: 800;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 215, 0, 0.25);
+  color: #e5e0d5;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.size-chip-btn:hover { border-color: var(--gold); color: var(--gold); }
+.size-chip-btn.active {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: #000;
+}
+
+.card-actions {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .card-cta {
-  margin-top: 12px;
+  width: 100%;
   height: 38px;
+  border: none;
   border-radius: 8px;
   background: var(--gold);
   color: #000;
@@ -653,10 +680,21 @@ button, input, select {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
+  cursor: pointer;
   transition: background 0.15s;
 }
 .card-cta:hover { background: var(--gold-hover); }
-.card-cta.out { background: #2c2820; color: #8c8475; }
+.card-cta.out { background: #2c2820; color: #8c8475; margin-top: 12px; }
+
+.card-size-link {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  padding: 2px 0;
+}
+.card-size-link:hover { color: var(--gold); text-decoration: underline; }
 
 /* ---------------- CATEGORY BANNERS ---------------- */
 .cat-banners {

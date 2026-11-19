@@ -55,27 +55,8 @@
   </div>
 </section>
 
-<!-- DESTACADOS -->
-<section class="section">
-  <div class="container">
-    <div class="section-head">
-      <div>
-        <span class="section-eyebrow">Destacados</span>
-        <h2 class="section-title">Los más elegidos</h2>
-      </div>
-      <a href="/categoria/cascos" class="link-more">Ver todos →</a>
-    </div>
-
-    <div class="product-grid">
-      {% for product in featured_products %}
-        {% include "_product_card.html" %}
-      {% endfor %}
-    </div>
-  </div>
-</section>
-
 <!-- CATEGORY BANNERS -->
-<section style="padding: 8px 0 24px;">
+<section style="padding: 36px 0 8px;">
   <div class="container cat-banners">
     {% for cat in categories %}
       <a href="/categoria/{{ cat.slug }}" class="cat-banner">
