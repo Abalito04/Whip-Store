@@ -1,14 +1,19 @@
 /* ==========================================================================
-   WHIP POS — Punto de Venta Local, Caja Diaria e Historial de Stock
+   WHIP POS — Paleta Blanco & Negro (Limpia, alto contraste para mostrador)
    ========================================================================== */
+
+body {
+  background: #f5f6f8;
+  color: #111111;
+}
 
 .pos-header {
   position: sticky;
   top: 0;
   z-index: 40;
-  background: rgba(10, 8, 5, 0.96);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--border);
+  background: #111111;
+  color: #ffffff;
+  border-bottom: 1px solid #262626;
 }
 
 .pos-header-bar {
@@ -27,21 +32,21 @@
   border-radius: 999px;
   font-size: 12px;
   font-weight: 700;
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  color: var(--muted);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #e5e7eb;
   cursor: pointer;
 }
 
 .pos-status-pill.open {
-  border-color: rgba(34, 197, 94, 0.45);
-  background: rgba(34, 197, 94, 0.14);
+  border-color: rgba(34, 197, 94, 0.55);
+  background: rgba(0, 166, 80, 0.22);
   color: #86efac;
 }
 
 .pos-status-pill.closed {
-  border-color: rgba(239, 68, 68, 0.45);
-  background: rgba(239, 68, 68, 0.14);
+  border-color: rgba(239, 68, 68, 0.55);
+  background: rgba(230, 57, 70, 0.22);
   color: #fca5a5;
 }
 
@@ -85,9 +90,9 @@
   height: 46px;
   padding: 0 14px 0 42px;
   border-radius: 11px;
-  border: 1.5px solid var(--border-strong);
-  background: #120e08;
-  color: var(--ink);
+  border: 1.5px solid #d1d5db;
+  background: #ffffff;
+  color: #111111;
   font-size: 15px;
   font-weight: 600;
   outline: none;
@@ -95,8 +100,8 @@
 }
 
 .scanner-input:focus {
-  border-color: var(--gold);
-  box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.16);
+  border-color: #111111;
+  box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.1);
 }
 
 .pos-brand-pills {
@@ -114,17 +119,19 @@
 }
 
 .pos-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
   border-radius: 12px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  transition: border-color 0.15s, transform 0.15s;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .pos-card:hover {
-  border-color: var(--border-strong);
+  border-color: #111111;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.07);
 }
 
 .pos-card-top {
@@ -138,7 +145,8 @@
   width: 64px;
   height: 64px;
   border-radius: 9px;
-  background: var(--card-media-bg);
+  background: #f8f9fa;
+  border: 1px solid #f3f4f6;
   flex-shrink: 0;
   overflow: hidden;
   display: flex;
@@ -162,7 +170,7 @@
   font-size: 10.5px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--muted);
+  color: #6b7280;
   font-weight: 700;
 }
 
@@ -171,7 +179,7 @@
   font-weight: 700;
   line-height: 1.25;
   margin: 2px 0 4px;
-  color: var(--ink);
+  color: #111111;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -181,7 +189,7 @@
 .pos-card-price {
   font-size: 14px;
   font-weight: 800;
-  color: var(--gold);
+  color: #111111;
 }
 
 .pos-variants {
@@ -197,9 +205,9 @@
   gap: 5px;
   padding: 5px 9px;
   border-radius: 8px;
-  border: 1px solid rgba(255, 215, 0, 0.28);
-  background: var(--surface-2);
-  color: var(--ink);
+  border: 1px solid #d1d5db;
+  background: #f8f9fa;
+  color: #111111;
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
@@ -207,31 +215,31 @@
 }
 
 .pos-size-btn:hover:not(:disabled) {
-  background: var(--gold);
-  color: #000;
-  border-color: var(--gold);
+  background: #111111;
+  color: #ffffff;
+  border-color: #111111;
 }
 
 .pos-size-btn .st-qty {
   font-size: 10.5px;
   padding: 1px 5px;
   border-radius: 5px;
-  background: rgba(34, 197, 94, 0.18);
-  color: #86efac;
+  background: #dcfce7;
+  color: #166534;
 }
 
 .pos-size-btn:hover:not(:disabled) .st-qty {
-  background: rgba(0, 0, 0, 0.18);
-  color: #000;
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
 }
 
 .pos-size-btn.low .st-qty {
-  background: rgba(245, 158, 11, 0.22);
-  color: #fcd34d;
+  background: #fef3c7;
+  color: #92400e;
 }
 
 .pos-size-btn:disabled {
-  opacity: 0.35;
+  opacity: 0.38;
   cursor: not-allowed;
   text-decoration: line-through;
 }
@@ -240,20 +248,21 @@
 .pos-ticket {
   position: sticky;
   top: 120px;
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
+  background: #ffffff;
+  border: 1px solid #d1d5db;
   border-radius: 14px;
   overflow: hidden;
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.08);
 }
 
 .pos-ticket-head {
   padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid #e5e7eb;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: rgba(255, 215, 0, 0.05);
+  background: #111111;
+  color: #ffffff;
 }
 
 .pos-ticket-items {
@@ -272,8 +281,8 @@
   gap: 8px;
   padding: 8px 10px;
   border-radius: 10px;
-  background: var(--surface-2);
-  border: 1px solid rgba(255, 215, 0, 0.12);
+  background: #f8f9fa;
+  border: 1px solid #e5e7eb;
 }
 
 .pos-cart-row-info {
@@ -284,6 +293,7 @@
 .pos-cart-row-title {
   font-size: 12.5px;
   font-weight: 700;
+  color: #111111;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -291,7 +301,7 @@
 
 .pos-cart-row-sub {
   font-size: 11px;
-  color: var(--muted);
+  color: #6b7280;
 }
 
 .pos-qty-ctrl {
@@ -304,21 +314,22 @@
   width: 26px;
   height: 26px;
   border-radius: 7px;
-  border: 1px solid var(--border);
-  background: #120e08;
-  color: var(--ink);
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #111111;
   font-weight: 800;
   cursor: pointer;
 }
 
 .pos-qty-ctrl button:hover {
-  border-color: var(--gold);
-  color: var(--gold);
+  border-color: #111111;
+  background: #111111;
+  color: #ffffff;
 }
 
 .pos-ticket-controls {
   padding: 12px 16px 16px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid #e5e7eb;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -339,9 +350,9 @@
 .pos-choice-btn {
   padding: 8px 6px;
   border-radius: 9px;
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  color: var(--muted);
+  border: 1px solid #d1d5db;
+  background: #f8f9fa;
+  color: #374151;
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
@@ -350,16 +361,16 @@
 }
 
 .pos-choice-btn.active {
-  background: rgba(255, 215, 0, 0.16);
-  border-color: var(--gold);
-  color: var(--gold);
+  background: #111111;
+  border-color: #111111;
+  color: #ffffff;
 }
 
 .pos-totals {
   padding: 10px 12px;
   border-radius: 10px;
-  background: #100d07;
-  border: 1px solid var(--border);
+  background: #f8f9fa;
+  border: 1px solid #e5e7eb;
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -369,7 +380,7 @@
 .pos-totals-row {
   display: flex;
   justify-content: space-between;
-  color: var(--muted);
+  color: #4b5563;
 }
 
 .pos-totals-grand {
@@ -378,10 +389,10 @@
   align-items: baseline;
   padding-top: 6px;
   margin-top: 4px;
-  border-top: 1px dashed var(--border);
+  border-top: 1px dashed #d1d5db;
   font-size: 19px;
   font-weight: 800;
-  color: var(--gold);
+  color: #111111;
 }
 
 /* Badges */
@@ -393,13 +404,13 @@
   font-weight: 800;
 }
 
-.ch-LOCAL { background: rgba(255, 215, 0, 0.18); color: #ffd700; }
-.ch-WEB { background: rgba(59, 130, 246, 0.18); color: #93c5fd; }
-.ch-WHATSAPP { background: rgba(34, 197, 94, 0.18); color: #86efac; }
-.ch-INSTAGRAM { background: rgba(236, 72, 153, 0.18); color: #f9a8d4; }
+.ch-LOCAL { background: #111111; color: #ffffff; }
+.ch-WEB { background: #dbeafe; color: #1d4ed8; }
+.ch-WHATSAPP { background: #dcfce7; color: #15803d; }
+.ch-INSTAGRAM { background: #fce7f3; color: #be185d; }
 
-.mov-pos { color: #86efac; font-weight: 800; }
-.mov-neg { color: #fca5a5; font-weight: 800; }
+.mov-pos { color: #00a650; font-weight: 800; }
+.mov-neg { color: #e63946; font-weight: 800; }
 
 /* Toast */
 .pos-toast {
@@ -407,14 +418,13 @@
   bottom: 22px;
   left: 50%;
   transform: translateX(-50%) translateY(20px);
-  background: #111;
-  border: 1.5px solid var(--gold);
-  color: var(--gold);
+  background: #111111;
+  color: #ffffff;
   padding: 10px 18px;
   border-radius: 10px;
   font-size: 13.5px;
   font-weight: 700;
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.24);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s, transform 0.2s;
@@ -427,14 +437,15 @@
 }
 
 .pos-toast.error {
-  border-color: var(--danger);
-  color: #fca5a5;
+  background: #e63946;
+  color: #ffffff;
 }
 
 /* Printable Ticket (80mm Thermal friendly) */
 .receipt-box {
   background: #ffffff;
   color: #111111;
+  border: 1px solid #e5e7eb;
   padding: 18px;
   border-radius: 10px;
   font-family: "Courier New", Courier, monospace;
@@ -453,6 +464,65 @@
   margin: 10px 0;
 }
 
+/* Barcode Labels Preview & Print */
+.barcode-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 10px;
+}
+
+.barcode-label {
+  background: #ffffff;
+  color: #111111;
+  border: 1px dashed #9ca3af;
+  border-radius: 8px;
+  padding: 10px 8px 8px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  break-inside: avoid;
+}
+
+.barcode-label-brand {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #4b5563;
+}
+
+.barcode-label-name {
+  font-size: 11.5px;
+  font-weight: 800;
+  line-height: 1.2;
+  margin: 2px 0 3px;
+  color: #000;
+}
+
+.barcode-label-meta {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #111;
+  margin-bottom: 4px;
+}
+
+.barcode-label-prices {
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #000;
+  margin-top: 3px;
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.barcode-label svg {
+  max-width: 100%;
+  height: auto;
+}
+
 @media (max-width: 980px) {
   .pos-split {
     grid-template-columns: 1fr;
@@ -466,10 +536,11 @@
   body * {
     visibility: hidden !important;
   }
-  #receiptPrintArea, #receiptPrintArea * {
+  body:not(.printing-barcodes) #receiptPrintArea,
+  body:not(.printing-barcodes) #receiptPrintArea * {
     visibility: visible !important;
   }
-  #receiptPrintArea {
+  body:not(.printing-barcodes) #receiptPrintArea {
     position: fixed;
     left: 0;
     top: 0;
@@ -477,6 +548,27 @@
     padding: 4mm;
     background: #fff !important;
     color: #000 !important;
+    border: none !important;
     box-shadow: none !important;
+  }
+  body.printing-barcodes #barcodePrintArea,
+  body.printing-barcodes #barcodePrintArea * {
+    visibility: visible !important;
+  }
+  body.printing-barcodes #barcodePrintArea {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: #fff !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 6mm !important;
+    padding: 4mm !important;
+  }
+  body.printing-barcodes .barcode-label {
+    border: 1px dashed #666 !important;
+    border-radius: 0 !important;
+    page-break-inside: avoid;
   }
 }

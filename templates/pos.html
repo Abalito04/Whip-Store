@@ -7,8 +7,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=4">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/pos.css') }}?v=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=5">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/pos.css') }}?v=3">
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 </head>
 <body>
 
@@ -17,9 +18,9 @@
   <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; padding:16px;">
     <div class="card-panel" style="max-width:420px; width:100%; padding:30px;">
       <div style="text-align:center; margin-bottom:22px;">
-        <div style="width:50px; height:50px; border-radius:12px; background:#000; border:1.5px solid #ffd700; color:#ffd700; display:flex; align-items:center; justify-content:center; margin:0 auto 10px; font-size:22px;">🏪</div>
-        <h1 style="margin:0; font-size:20px; font-weight:800; color:#ffd700;">Whip POS — Gestor Local</h1>
-        <p style="margin:4px 0 0; font-size:12.5px; color:#b8b0a0;">Ventas de mostrador, lector de código de barras, caja diaria y stock sincronizado con la web.</p>
+        <div style="width:50px; height:50px; border-radius:12px; background:#111; color:#fff; display:flex; align-items:center; justify-content:center; margin:0 auto 10px; font-size:22px;">🏪</div>
+        <h1 style="margin:0; font-size:20px; font-weight:800; color:#111;">Whip POS — Gestor Local</h1>
+        <p style="margin:4px 0 0; font-size:12.5px; color:#6b7280;">Ventas de mostrador, lector de código de barras, caja diaria y stock sincronizado con la web.</p>
       </div>
 
       <form id="posLoginForm" style="display:flex; flex-direction:column; gap:14px;">
@@ -45,7 +46,7 @@
   <header class="pos-header">
     <div class="pos-container pos-header-bar" style="padding-top:0; padding-bottom:0;">
       <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-        <strong style="font-size:17px; letter-spacing:-0.02em; color:#ffd700;">🏪 WHIP POS</strong>
+        <strong style="font-size:17px; letter-spacing:-0.02em; color:#ffffff;">🏪 WHIP POS</strong>
         <button type="button" id="cashStatusPill" class="pos-status-pill closed" onclick="window.WhipPOS.switchTab('caja')">
           <span id="cashStatusDot">🔴</span>
           <span id="cashStatusText">Caja Cerrada</span>
@@ -58,7 +59,7 @@
     </div>
     <div class="pos-container admin-tabs" style="padding-top:0; padding-bottom:0;">
       <button type="button" class="admin-tab active" data-tab="mostrador" onclick="window.WhipPOS.switchTab('mostrador')">🛒 Mostrador (POS)</button>
-      <button type="button" class="admin-tab" data-tab="stock" onclick="window.WhipPOS.switchTab('stock')">📦 Stock y Productos <span id="posBadgeLowStock" style="color:#ffd700;"></span></button>
+      <button type="button" class="admin-tab" data-tab="stock" onclick="window.WhipPOS.switchTab('stock')">📦 Stock y Productos <span id="posBadgeLowStock" style="color:#fbbf24;"></span></button>
       <button type="button" class="admin-tab" data-tab="caja" onclick="window.WhipPOS.switchTab('caja')">💵 Caja Diaria</button>
       <button type="button" class="admin-tab" data-tab="ventas" onclick="window.WhipPOS.switchTab('ventas')">🧾 Ventas y Pedidos <span id="posBadgePending"></span></button>
       <button type="button" class="admin-tab" data-tab="movimientos" onclick="window.WhipPOS.switchTab('movimientos')">📋 Historial Stock</button>
@@ -96,8 +97,8 @@
         <aside class="pos-ticket">
           <div class="pos-ticket-head">
             <div>
-              <strong style="font-size:15px; color:#ffd700;">Ticket de Venta</strong>
-              <div style="font-size:11.5px; color:var(--muted);" id="posCartCountLabel">0 ítems</div>
+              <strong style="font-size:15px; color:#ffffff;">Ticket de Venta</strong>
+              <div style="font-size:11.5px; color:#d1d5db;" id="posCartCountLabel">0 ítems</div>
             </div>
             <button type="button" onclick="window.WhipPOS.clearCart()" style="background:none; border:none; color:#fca5a5; font-size:12px; font-weight:700; cursor:pointer;">Vaciar</button>
           </div>
@@ -152,7 +153,7 @@
 
             <div class="pos-totals">
               <div class="pos-totals-row"><span>Subtotal</span><strong id="posSubtotal">$ 0</strong></div>
-              <div class="pos-totals-row"><span>Descuento</span><strong id="posDiscount" style="color:#86efac;">-$ 0</strong></div>
+              <div class="pos-totals-row"><span>Descuento</span><strong id="posDiscount" style="color:#00a650;">-$ 0</strong></div>
               <div class="pos-totals-grand"><span>TOTAL</span><span id="posTotal">$ 0</span></div>
             </div>
 
@@ -172,7 +173,7 @@
           id="posStockSearch"
           placeholder="Buscar producto por nombre, marca o SKU..."
           oninput="window.WhipPOS.onStockSearch()"
-          style="height:40px; padding:0 14px; border-radius:9px; border:1px solid var(--border-strong); background:#120e08; color:#fff; width:100%; max-width:380px; font-size:13.5px;"
+          style="height:40px; padding:0 14px; border-radius:9px; border:1px solid #d1d5db; background:#ffffff; color:#111111; width:100%; max-width:380px; font-size:13.5px;"
         >
         <button type="button" class="btn btn-cta" style="height:40px; font-size:13px;" onclick="document.getElementById('posNewProductModal').classList.add('open')">+ Nuevo Producto</button>
       </div>
@@ -189,15 +190,15 @@
         <div id="posStockPagination" style="padding:12px 16px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; font-size:12.5px; color:var(--muted);"></div>
       </div>
 
-      <details id="posLowStockCard" class="card-panel" style="padding:0; overflow:hidden; border-color:rgba(255,215,0,0.42);">
-        <summary style="padding:14px 18px; background:rgba(255,215,0,0.08); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; cursor:pointer; list-style:none;">
+      <details id="posLowStockCard" class="card-panel" style="padding:0; overflow:hidden; border-color:#f59e0b;">
+        <summary style="padding:14px 18px; background:#fffbeb; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; cursor:pointer; list-style:none;">
           <div>
-            <strong style="color:#ffd700; font-size:14.5px;">⚠️ Alertas de Bajo Stock (≤ 2 unidades)</strong>
-            <span style="font-size:12px; color:var(--muted); margin-left:8px;">Tocá para desplegar y reponer en 1 clic</span>
+            <strong style="color:#b45309; font-size:14.5px;">⚠️ Alertas de Bajo Stock (≤ 2 unidades)</strong>
+            <span style="font-size:12px; color:#6b7280; margin-left:8px;">Tocá para desplegar y reponer en 1 clic</span>
           </div>
           <div style="display:flex; align-items:center; gap:10px;">
-            <span id="posLowStockCount" style="font-size:12px; font-weight:800; color:#ffd700;"></span>
-            <span style="font-size:12px; color:var(--muted); font-weight:700;">Desplegar ▾</span>
+            <span id="posLowStockCount" style="font-size:12px; font-weight:800; color:#b45309;"></span>
+            <span style="font-size:12px; color:#4b5563; font-weight:700;">Desplegar ▾</span>
           </div>
         </summary>
         <div style="overflow-x:auto; border-top:1px solid var(--border);">
@@ -212,8 +213,8 @@
     <!-- TAB 3: CAJA DIARIA -->
     <section id="pos-tab-caja" class="pos-tab-panel" style="display:none;">
       <div id="cashOpenGate" class="card-panel" style="max-width:480px; margin:20px auto; padding:26px; display:none;">
-        <h2 style="margin:0 0 6px; color:#ffd700;">💵 Abrir Caja Diaria</h2>
-        <p style="margin:0 0 18px; font-size:13px; color:var(--muted);">Ingresá el efectivo inicial (cambio) con el que arrancás el turno.</p>
+        <h2 style="margin:0 0 6px; color:#111;">💵 Abrir Caja Diaria</h2>
+        <p style="margin:0 0 18px; font-size:13px; color:#6b7280;">Ingresá el efectivo inicial (cambio) con el que arrancás el turno.</p>
         <form id="openCashForm" style="display:flex; flex-direction:column; gap:12px;">
           <div class="field">
             <label>Efectivo inicial en caja (ARS)</label>
@@ -230,31 +231,31 @@
       <div id="cashActiveWrap" style="display:none;">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
           <div>
-            <h2 style="margin:0; font-size:19px; color:#ffd700;">Caja Abierta <span id="cashOpenedAt" style="font-size:13px; color:var(--muted); font-weight:500;"></span></h2>
+            <h2 style="margin:0; font-size:19px; color:#111;">Caja Abierta <span id="cashOpenedAt" style="font-size:13px; color:#6b7280; font-weight:500;"></span></h2>
           </div>
-          <button type="button" class="btn btn-outline" style="border-color:#ef4444; color:#fca5a5;" onclick="window.WhipPOS.openCloseCashModal()">🔒 Cerrar Caja (Arqueo)</button>
+          <button type="button" class="btn btn-outline" style="border-color:#e63946; color:#e63946;" onclick="window.WhipPOS.openCloseCashModal()">🔒 Cerrar Caja (Arqueo)</button>
         </div>
 
         <div class="kpi-grid">
-          <div class="kpi-card" style="border-color:rgba(255,215,0,0.45); background:rgba(255,215,0,0.08);">
-            <div class="kpi-label" style="color:#ffd700;">Efectivo Esperado en Caja</div>
-            <div class="kpi-value" style="color:#ffd700;" id="kpiCashExpected">$ 0</div>
-            <div style="font-size:12px; color:var(--muted); margin-top:4px;" id="kpiCashOpeningSub">Apertura: $ 0</div>
+          <div class="kpi-card" style="border-color:#111; background:#111; color:#fff;">
+            <div class="kpi-label" style="color:#d1d5db;">Efectivo Esperado en Caja</div>
+            <div class="kpi-value" style="color:#fff;" id="kpiCashExpected">$ 0</div>
+            <div style="font-size:12px; color:#9ca3af; margin-top:4px;" id="kpiCashOpeningSub">Apertura: $ 0</div>
           </div>
           <div class="kpi-card">
             <div class="kpi-label">Total Ventas del Turno</div>
             <div class="kpi-value" id="kpiCashSales">$ 0</div>
-            <div style="font-size:12px; color:var(--muted); margin-top:4px;" id="kpiCashSalesCount">0 ventas</div>
+            <div style="font-size:12px; color:#6b7280; margin-top:4px;" id="kpiCashSalesCount">0 ventas</div>
           </div>
           <div class="kpi-card">
             <div class="kpi-label">Transferencias / Tarjetas / MP</div>
             <div class="kpi-value" id="kpiCashDigital">$ 0</div>
-            <div style="font-size:12px; color:var(--muted); margin-top:4px;" id="kpiCashDigitalSub">—</div>
+            <div style="font-size:12px; color:#6b7280; margin-top:4px;" id="kpiCashDigitalSub">—</div>
           </div>
           <div class="kpi-card">
             <div class="kpi-label">Gastos / Retiros (Efectivo)</div>
-            <div class="kpi-value" style="color:#fca5a5;" id="kpiCashOut">$ 0</div>
-            <div style="font-size:12px; color:var(--muted); margin-top:4px;">Egresos del turno</div>
+            <div class="kpi-value" style="color:#e63946;" id="kpiCashOut">$ 0</div>
+            <div style="font-size:12px; color:#6b7280; margin-top:4px;">Egresos del turno</div>
           </div>
         </div>
 
@@ -306,7 +307,7 @@
     <!-- TAB 3: HISTORIAL Y MOVIMIENTOS DE STOCK -->
     <section id="pos-tab-movimientos" class="pos-tab-panel" style="display:none;">
       <div class="card-panel" style="padding:18px; margin-bottom:18px;">
-        <h3 style="margin:0 0 12px; font-size:15px; color:#ffd700;">📦 Registrar Ingreso o Ajuste de Stock</h3>
+        <h3 style="margin:0 0 12px; font-size:15px; color:#111;">📦 Registrar Ingreso o Ajuste de Stock</h3>
         <form id="stockMovementForm" style="display:grid; grid-template-columns:2fr 140px 110px 1.4fr 140px; gap:10px; align-items:end;">
           <div class="field">
             <label>Producto y Variante</label>
@@ -448,13 +449,13 @@
         </div>
         <div class="field">
           <label>Descripción</label>
-          <textarea id="epDescription" rows="3" style="width:100%; padding:10px 12px; border-radius:9px; border:1px solid var(--border); background:#120e08; color:#fff; font-family:inherit; font-size:13px; resize:vertical;"></textarea>
+          <textarea id="epDescription" rows="3" style="width:100%; padding:10px 12px; border-radius:9px; border:1px solid #d1d5db; background:#f8f9fa; color:#111; font-family:inherit; font-size:13px; resize:vertical;"></textarea>
         </div>
 
         <!-- FOTOS -->
-        <div style="padding:12px; border-radius:10px; background:var(--surface-2); border:1px solid var(--border);">
+        <div style="padding:12px; border-radius:10px; background:#f8f9fa; border:1px solid #e5e7eb;">
           <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
-            <strong style="font-size:13px; color:#ffd700;">📷 Fotos del producto</strong>
+            <strong style="font-size:13px; color:#111;">📷 Fotos del producto</strong>
             <label class="btn btn-outline" style="height:30px; padding:0 10px; font-size:11.5px; cursor:pointer;">
               📤 Subir foto desde PC
               <input type="file" id="epImageFileInput" accept="image/png,image/jpeg,image/webp" style="display:none;" onchange="window.WhipPOS.uploadEditImage(this)">
@@ -462,15 +463,15 @@
           </div>
           <div id="epImagesList" style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px;"></div>
           <div style="display:flex; gap:6px;">
-            <input type="text" id="epImageUrlInput" placeholder="O pegá una URL / ruta de imagen (ej: /static/images/...)" style="flex:1; height:34px; padding:0 10px; border-radius:8px; border:1px solid var(--border); background:#120e08; color:#fff; font-size:12px;">
+            <input type="text" id="epImageUrlInput" placeholder="O pegá una URL / ruta de imagen (ej: /static/images/...)" style="flex:1; height:34px; padding:0 10px; border-radius:8px; border:1px solid #d1d5db; background:#fff; color:#111; font-size:12px;">
             <button type="button" class="btn btn-outline" style="height:34px; padding:0 12px; font-size:12px;" onclick="window.WhipPOS.addEditImageUrl()">+ Agregar</button>
           </div>
         </div>
 
         <!-- TALLES / VARIANTES -->
-        <div style="padding:12px; border-radius:10px; background:var(--surface-2); border:1px solid var(--border);">
+        <div style="padding:12px; border-radius:10px; background:#f8f9fa; border:1px solid #e5e7eb;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <strong style="font-size:13px; color:#ffd700;">🏷️ Talles / Variantes y Stock</strong>
+            <strong style="font-size:13px; color:#111;">🏷️ Talles / Variantes y Stock</strong>
             <button type="button" class="btn btn-outline" style="height:28px; padding:0 10px; font-size:11.5px;" onclick="window.WhipPOS.addEditVariantRow()">+ Agregar talle</button>
           </div>
           <div style="display:grid; grid-template-columns:75px 1fr 1.1fr 75px 32px; gap:6px; font-size:11px; color:var(--muted); margin-bottom:5px; font-weight:700;">
@@ -484,6 +485,39 @@
           <button type="submit" id="epSaveBtn" class="btn btn-cta" style="flex:1;">Guardar Cambios</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- MODAL ETIQUETAS DE CÓDIGO DE BARRAS -->
+  <div class="modal-backdrop" id="barcodeModal" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="modal-box" style="max-width:740px; max-height:92vh; overflow-y:auto;">
+      <div class="cart-head">
+        <h2>🏷️ Etiquetas de Código de Barras (Code 128)</h2>
+        <button type="button" onclick="document.getElementById('barcodeModal').classList.remove('open')" style="background:none; border:none; font-size:20px; cursor:pointer; color:var(--ink);">✕</button>
+      </div>
+      <div style="padding:18px; display:flex; flex-direction:column; gap:14px;">
+        <div id="barcodeProductTitle" style="font-weight:800; font-size:15px; color:#111;"></div>
+
+        <div style="padding:12px; border-radius:10px; background:#f8f9fa; border:1px solid #e5e7eb;">
+          <div style="font-size:12px; font-weight:700; color:var(--muted); margin-bottom:8px;">Cantidad de etiquetas a imprimir por talle:</div>
+          <div id="barcodeQtyControls" style="display:flex; flex-wrap:wrap; gap:10px;"></div>
+          <div style="display:flex; gap:16px; flex-wrap:wrap; margin-top:12px; padding-top:10px; border-top:1px solid var(--border); font-size:12.5px;">
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+              <input type="checkbox" id="bcShowListPrice" checked onchange="window.WhipPOS.renderBarcodePreview()"> Mostrar Precio Lista
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+              <input type="checkbox" id="bcShowCashPrice" checked onchange="window.WhipPOS.renderBarcodePreview()"> Mostrar Precio Ef/Tr
+            </label>
+          </div>
+        </div>
+
+        <div id="barcodePrintArea" class="barcode-grid"></div>
+
+        <div style="display:flex; gap:10px;">
+          <button type="button" class="btn btn-outline" style="flex:1;" onclick="document.getElementById('barcodeModal').classList.remove('open')">Cerrar</button>
+          <button type="button" class="btn btn-cta" style="flex:1;" onclick="window.WhipPOS.printBarcodes()">🖨️ Imprimir Etiquetas</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -512,8 +546,8 @@
         <button type="button" onclick="document.getElementById('closeCashModal').classList.remove('open')" style="background:none; border:none; font-size:20px; cursor:pointer; color:var(--ink);">✕</button>
       </div>
       <form id="closeCashForm" style="padding:20px; display:flex; flex-direction:column; gap:12px;">
-        <div style="padding:12px; border-radius:10px; background:var(--surface-2); border:1px solid var(--border); font-size:13px;">
-          Efectivo esperado en caja: <strong id="closeExpectedLabel" style="color:#ffd700; font-size:16px;">$ 0</strong>
+        <div style="padding:12px; border-radius:10px; background:#f8f9fa; border:1px solid #e5e7eb; font-size:13px;">
+          Efectivo esperado en caja: <strong id="closeExpectedLabel" style="color:#111; font-size:16px;">$ 0</strong>
         </div>
         <div class="field">
           <label>Efectivo real contado (ARS) *</label>
@@ -535,6 +569,6 @@
   <div id="posToast" class="pos-toast"></div>
 {% endif %}
 
-<script src="{{ url_for('static', filename='js/pos.js') }}?v=5"></script>
+<script src="{{ url_for('static', filename='js/pos.js') }}?v=7"></script>
 </body>
 </html>

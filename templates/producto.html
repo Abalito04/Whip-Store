@@ -50,10 +50,10 @@
             <span class="price-old" style="font-size:16px;">{{ product.compare_at_price|ars }}</span>
           {% endif %}
         </div>
-        <p style="font-size:13.5px; color:#d6d0c4; margin:8px 0 4px;">
+        <p style="font-size:13.5px; color:#374151; margin:8px 0 4px;">
           💳 <strong>6 cuotas sin interés</strong> de <strong>{{ product.installment_price|ars }}</strong> con Mercado Pago
         </p>
-        <p style="font-size:13.5px; font-weight:800; color:#ffd700; margin:0;">
+        <p style="font-size:13.5px; font-weight:800; color:#00A650; margin:0;">
           🏦 {{ product.transfer_price|ars }} abonando por Transferencia ({{ product.transfer_discount }}% OFF)
         </p>
       </div>
@@ -100,15 +100,15 @@
   <!-- DESCRIPCIÓN Y FICHA TÉCNICA -->
   <div class="specs-grid">
     <div>
-      <h2 style="font-size:18px; font-weight:800; color:#ffd700; margin:0 0 12px;">Descripción</h2>
-      <p style="font-size:14px; color:#d6d0c4; line-height:1.7; margin:0;">{{ product.description }}</p>
+      <h2 style="font-size:18px; font-weight:800; margin:0 0 12px;">Descripción</h2>
+      <p style="font-size:14px; color:#4b5563; line-height:1.7; margin:0;">{{ product.description }}</p>
     </div>
     <div>
-      <h2 style="font-size:18px; font-weight:800; color:#ffd700; margin:0 0 12px;">Ficha Técnica</h2>
+      <h2 style="font-size:18px; font-weight:800; margin:0 0 12px;">Ficha Técnica</h2>
       <div class="specs-table">
         {% for k, val in (product.specs_json or {}).items() %}
           <div class="specs-row">
-            <strong style="color:#b8b0a0;">{{ k }}</strong>
+            <strong style="color:#4b5563;">{{ k }}</strong>
             <span>{{ val }}</span>
           </div>
         {% endfor %}

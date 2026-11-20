@@ -155,7 +155,7 @@
               <div class="pos-card-brand">${p.brand}</div>
               <div class="pos-card-name">${p.name}</div>
               <div class="pos-card-price">${fmt(p.price)}</div>
-              <div style="font-size:11px; color:#86efac; font-weight:700;">Ef/Tr: ${fmt(p.transfer_price)}</div>
+              <div style="font-size:11px; color:#00a650; font-weight:700;">Ef/Tr: ${fmt(p.transfer_price)}</div>
             </div>
           </div>
           <div class="pos-variants">${variantsHtml}</div>
@@ -505,13 +505,13 @@
     const diff = counted - state.activeSession.expected_cash;
     const lbl = document.getElementById("closeDiffLabel");
     if (diff === 0) {
-      lbl.style.color = "#86efac";
+      lbl.style.color = "#00a650";
       lbl.textContent = "✅ Caja cuadrada ($ 0 diferencia)";
     } else if (diff > 0) {
-      lbl.style.color = "#fcd34d";
+      lbl.style.color = "#d97706";
       lbl.textContent = `⚠️ Sobrante de ${fmt(diff)}`;
     } else {
-      lbl.style.color = "#fca5a5";
+      lbl.style.color = "#e63946";
       lbl.textContent = `❌ Faltante de ${fmt(Math.abs(diff))}`;
     }
   }
@@ -617,7 +617,7 @@
               <td><strong>${x.product_name}</strong> <span style="font-size:11.5px; color:var(--muted);">(${x.brand})</span></td>
               <td><strong>${x.size}</strong></td>
               <td style="font-family:monospace; font-size:12px;">${x.sku}</td>
-              <td><span class="${x.stock === 0 ? "mov-neg" : ""}" style="${x.stock > 0 ? "color:#fcd34d;font-weight:800;" : ""}">${x.stock} u.</span></td>
+              <td><span class="${x.stock === 0 ? "mov-neg" : ""}" style="${x.stock > 0 ? "color:#d97706;font-weight:800;" : ""}">${x.stock} u.</span></td>
               <td style="text-align:right;">
                 <button type="button" class="btn btn-cta" style="height:28px; padding:0 10px; font-size:11.5px;" onclick="window.WhipPOS.quickRestock(${x.variant_id}, ${x.stock + 3})">+3 u.</button>
               </td>
@@ -653,11 +653,11 @@
             const img = (p.images && p.images[0]) || "/static/images/cat-cascos.jpg";
             const variantsHtml = p.variants
               .map(
-                (v) => `<div style="display:inline-flex; align-items:center; gap:4px; margin:2px 4px 2px 0; padding:3px 6px; border-radius:7px; background:var(--surface-2); border:1px solid var(--border); font-size:12px;">
-                  <strong style="min-width:20px;">${v.size}</strong>
-                  <button type="button" onclick="window.WhipPOS.setVariantStock(${v.id}, ${Math.max(0, v.stock - 1)})" style="width:22px;height:22px;border-radius:5px;border:1px solid var(--border);background:#120e08;color:#fff;cursor:pointer;">-</button>
-                  <span style="min-width:18px;text-align:center;font-weight:800;color:${v.stock === 0 ? "#fca5a5" : v.stock <= 2 ? "#fcd34d" : "#86efac"};">${v.stock}</span>
-                  <button type="button" onclick="window.WhipPOS.setVariantStock(${v.id}, ${v.stock + 1})" style="width:22px;height:22px;border-radius:5px;border:1px solid var(--border);background:#120e08;color:#fff;cursor:pointer;">+</button>
+                (v) => `<div style="display:inline-flex; align-items:center; gap:4px; margin:2px 4px 2px 0; padding:3px 6px; border-radius:7px; background:#f8f9fa; border:1px solid #e5e7eb; font-size:12px;">
+                  <strong style="min-width:20px; color:#111;">${v.size}</strong>
+                  <button type="button" onclick="window.WhipPOS.setVariantStock(${v.id}, ${Math.max(0, v.stock - 1)})" style="width:22px;height:22px;border-radius:5px;border:1px solid #d1d5db;background:#fff;color:#111;cursor:pointer;font-weight:800;">-</button>
+                  <span style="min-width:18px;text-align:center;font-weight:800;color:${v.stock === 0 ? "#e63946" : v.stock <= 2 ? "#d97706" : "#00a650"};">${v.stock}</span>
+                  <button type="button" onclick="window.WhipPOS.setVariantStock(${v.id}, ${v.stock + 1})" style="width:22px;height:22px;border-radius:5px;border:1px solid #d1d5db;background:#fff;color:#111;cursor:pointer;font-weight:800;">+</button>
                 </div>`
               )
               .join("");
@@ -665,35 +665,36 @@
             return `<tr>
               <td>
                 <div style="display:flex; align-items:center; gap:10px;">
-                  <img src="${img}" alt="" style="width:40px;height:40px;border-radius:7px;object-fit:contain;background:#f6f4ee;padding:2px;">
+                  <img src="${img}" alt="" style="width:40px;height:40px;border-radius:7px;object-fit:contain;background:#f8f9fa;border:1px solid #e5e7eb;padding:2px;">
                   <div>
-                    <div style="font-weight:700; font-size:13px;">${p.name}</div>
-                    <div style="font-size:11.5px; color:var(--muted);">${p.brand} · Total: ${p.total_stock} u.</div>
+                    <div style="font-weight:700; font-size:13px; color:#111;">${p.name}</div>
+                    <div style="font-size:11.5px; color:#6b7280;">${p.brand} · Total: ${p.total_stock} u.</div>
                   </div>
                 </div>
               </td>
               <td>
                 <div style="display:flex; flex-direction:column; gap:5px;">
                   <div style="display:flex; align-items:center; gap:5px;">
-                    <span style="font-size:10.5px; color:var(--muted); min-width:38px;">Lista:</span>
-                    <input type="number" id="price-in-${p.id}" value="${p.price}" style="width:98px; height:28px; padding:0 7px; border-radius:6px; border:1px solid var(--border); background:#120e08; color:#ffd700; font-weight:700; font-size:12px;">
+                    <span style="font-size:10.5px; color:#6b7280; min-width:38px;">Lista:</span>
+                    <input type="number" id="price-in-${p.id}" value="${p.price}" style="width:98px; height:28px; padding:0 7px; border-radius:6px; border:1px solid #d1d5db; background:#fff; color:#111; font-weight:700; font-size:12px;">
                   </div>
                   <div style="display:flex; align-items:center; gap:5px;">
-                    <span style="font-size:10.5px; color:#86efac; min-width:38px;">Ef/Tr:</span>
-                    <input type="number" id="cash-in-${p.id}" value="${p.cash_price || p.transfer_price}" style="width:98px; height:28px; padding:0 7px; border-radius:6px; border:1px solid rgba(34,197,94,0.35); background:#120e08; color:#86efac; font-weight:700; font-size:12px;">
+                    <span style="font-size:10.5px; color:#00a650; min-width:38px; font-weight:700;">Ef/Tr:</span>
+                    <input type="number" id="cash-in-${p.id}" value="${p.cash_price || p.transfer_price}" style="width:98px; height:28px; padding:0 7px; border-radius:6px; border:1px solid #86efac; background:#f0fdf4; color:#065f46; font-weight:700; font-size:12px;">
                     <button type="button" class="btn btn-outline" style="height:28px; padding:0 8px; font-size:11px;" onclick="window.WhipPOS.savePrice(${p.id})">Guardar</button>
                   </div>
                 </div>
               </td>
               <td>${variantsHtml}</td>
               <td>
-                <button type="button" class="ch-badge ${p.is_active ? "ch-WHATSAPP" : ""}" style="border:none; cursor:pointer; ${p.is_active ? "" : "background:rgba(239,68,68,0.18);color:#fca5a5;"}" onclick="window.WhipPOS.toggleActive(${p.id}, ${!p.is_active})">
+                <button type="button" class="ch-badge ${p.is_active ? "ch-WHATSAPP" : ""}" style="border:none; cursor:pointer; ${p.is_active ? "" : "background:#fee2e2;color:#b91c1c;"}" onclick="window.WhipPOS.toggleActive(${p.id}, ${!p.is_active})">
                   ${p.is_active ? "● Activo" : "○ Pausado"}
                 </button>
               </td>
               <td style="text-align:right; white-space:nowrap;">
+                <button type="button" class="btn btn-outline" style="height:30px; padding:0 9px; font-size:11.5px; margin-right:4px;" title="Generar e imprimir códigos de barras" onclick="window.WhipPOS.openBarcodeModal(${p.id})">🏷️ Códigos</button>
                 <button type="button" class="btn btn-outline" style="height:30px; padding:0 9px; font-size:11.5px; margin-right:4px;" onclick="window.WhipPOS.openEditProduct(${p.id})">✏️ Editar</button>
-                <button type="button" class="btn btn-outline" style="height:30px; padding:0 9px; font-size:11px; border-color:#ef4444; color:#fca5a5;" onclick="window.WhipPOS.deleteProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}')">Eliminar</button>
+                <button type="button" class="btn btn-outline" style="height:30px; padding:0 9px; font-size:11px; border-color:#e63946; color:#e63946;" onclick="window.WhipPOS.deleteProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}')">Eliminar</button>
               </td>
             </tr>`;
           })
@@ -806,11 +807,11 @@
     row.style.cssText = "display:grid; grid-template-columns:75px 1fr 1.1fr 75px 32px; gap:6px; align-items:center;";
     row.innerHTML = `
       <input type="hidden" class="ev-id" value="${v.id || ""}">
-      <input type="text" class="ev-size" value="${(v.size || "").replace(/"/g, "&quot;")}" placeholder="M" required style="height:34px; padding:0 8px; border-radius:7px; border:1px solid var(--border); background:#120e08; color:#fff; font-size:12.5px;">
-      <input type="text" class="ev-color" value="${(v.color || "").replace(/"/g, "&quot;")}" placeholder="Negro" style="height:34px; padding:0 8px; border-radius:7px; border:1px solid var(--border); background:#120e08; color:#fff; font-size:12.5px;">
-      <input type="text" class="ev-sku" value="${(v.sku || "").replace(/"/g, "&quot;")}" placeholder="Auto SKU" style="height:34px; padding:0 8px; border-radius:7px; border:1px solid var(--border); background:#120e08; color:#fff; font-size:12px; font-family:monospace;">
-      <input type="number" class="ev-stock" value="${v.stock ?? 0}" min="0" style="height:34px; padding:0 8px; border-radius:7px; border:1px solid var(--border); background:#120e08; color:#ffd700; font-weight:700; font-size:12.5px;">
-      <button type="button" onclick="this.parentElement.remove()" title="Quitar talle" style="width:30px; height:34px; border-radius:7px; border:1px solid rgba(239,68,68,0.4); background:rgba(239,68,68,0.12); color:#fca5a5; cursor:pointer; font-weight:800;">✕</button>
+      <input type="text" class="ev-size" value="${(v.size || "").replace(/"/g, "&quot;")}" placeholder="M" required style="height:34px; padding:0 8px; border-radius:7px; border:1px solid #d1d5db; background:#fff; color:#111; font-size:12.5px;">
+      <input type="text" class="ev-color" value="${(v.color || "").replace(/"/g, "&quot;")}" placeholder="Negro" style="height:34px; padding:0 8px; border-radius:7px; border:1px solid #d1d5db; background:#fff; color:#111; font-size:12.5px;">
+      <input type="text" class="ev-sku" value="${(v.sku || "").replace(/"/g, "&quot;")}" placeholder="Auto SKU" style="height:34px; padding:0 8px; border-radius:7px; border:1px solid #d1d5db; background:#fff; color:#111; font-size:12px; font-family:monospace;">
+      <input type="number" class="ev-stock" value="${v.stock ?? 0}" min="0" style="height:34px; padding:0 8px; border-radius:7px; border:1px solid #d1d5db; background:#fff; color:#111; font-weight:700; font-size:12.5px;">
+      <button type="button" onclick="this.parentElement.remove()" title="Quitar talle" style="width:30px; height:34px; border-radius:7px; border:1px solid #fecaca; background:#fef2f2; color:#e63946; cursor:pointer; font-weight:800;">✕</button>
     `;
     wrap.appendChild(row);
   }
@@ -958,6 +959,95 @@
     }
   });
 
+  // ---------------- CÓDIGOS DE BARRAS (CODE 128) ----------------
+  let barcodeProduct = null;
+
+  function openBarcodeModal(productId) {
+    const p = state.products.find((x) => x.id === productId);
+    if (!p) return;
+    barcodeProduct = p;
+
+    document.getElementById("barcodeProductTitle").textContent = `${p.brand} — ${p.name}`;
+    const qtyWrap = document.getElementById("barcodeQtyControls");
+    qtyWrap.innerHTML = (p.variants || [])
+      .map(
+        (v) => `<div style="display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:8px; background:#fff; border:1px solid #d1d5db; font-size:12px;">
+          <strong style="color:#111;">Talle ${v.size}</strong>
+          <span style="font-family:monospace; color:#6b7280; font-size:11px;">${v.sku}</span>
+          <input type="number" class="bc-qty-input" data-variant-id="${v.id}" value="${v.stock > 0 ? v.stock : 1}" min="0" max="50" oninput="window.WhipPOS.renderBarcodePreview()" style="width:52px; height:28px; padding:0 6px; border-radius:6px; border:1px solid #d1d5db; background:#f8f9fa; color:#111; font-weight:700; text-align:center;">
+        </div>`
+      )
+      .join("");
+
+    renderBarcodePreview();
+    document.getElementById("barcodeModal").classList.add("open");
+  }
+
+  function renderBarcodePreview() {
+    const area = document.getElementById("barcodePrintArea");
+    if (!area || !barcodeProduct) return;
+
+    const showList = Boolean(document.getElementById("bcShowListPrice")?.checked);
+    const showCash = Boolean(document.getElementById("bcShowCashPrice")?.checked);
+    const inputs = Array.from(document.querySelectorAll("#barcodeQtyControls .bc-qty-input"));
+
+    area.innerHTML = "";
+    let totalLabels = 0;
+
+    for (const inp of inputs) {
+      const vid = parseInt(inp.dataset.variantId, 10);
+      const qty = Math.min(50, Math.max(0, parseInt(inp.value || "0", 10) || 0));
+      const v = (barcodeProduct.variants || []).find((x) => x.id === vid);
+      if (!v || qty <= 0) continue;
+
+      for (let i = 0; i < qty; i++) {
+        totalLabels++;
+        const card = document.createElement("div");
+        card.className = "barcode-label";
+        const svgId = `bc-svg-${vid}-${i}`;
+        const priceParts = [];
+        if (showList) priceParts.push(`<span>Lista: ${fmt(barcodeProduct.price)}</span>`);
+        if (showCash) priceParts.push(`<span>Ef/Tr: ${fmt(barcodeProduct.transfer_price)}</span>`);
+
+        card.innerHTML = `
+          <div class="barcode-label-brand">WHIP STORE · ${barcodeProduct.brand}</div>
+          <div class="barcode-label-name">${barcodeProduct.name}</div>
+          <div class="barcode-label-meta">Talle ${v.size} · ${v.color}</div>
+          <svg id="${svgId}"></svg>
+          ${priceParts.length ? `<div class="barcode-label-prices">${priceParts.join("")}</div>` : ""}
+        `;
+        area.appendChild(card);
+
+        if (window.JsBarcode) {
+          try {
+            window.JsBarcode(`#${svgId}`, v.sku, {
+              format: "CODE128",
+              width: 1.5,
+              height: 40,
+              displayValue: true,
+              fontSize: 11,
+              margin: 4,
+              background: "#ffffff",
+              lineColor: "#000000",
+            });
+          } catch {
+            // fallback si el SKU tuviera caracteres no válidos
+          }
+        }
+      }
+    }
+
+    if (totalLabels === 0) {
+      area.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:20px; color:var(--muted); font-size:13px;">Elegí al menos 1 etiqueta para previsualizar.</div>`;
+    }
+  }
+
+  function printBarcodes() {
+    document.body.classList.add("printing-barcodes");
+    window.print();
+    setTimeout(() => document.body.classList.remove("printing-barcodes"), 400);
+  }
+
   // ---------------- RECENT SALES & WEB ORDERS ----------------
   function renderRecentSalesTab() {
     const body = document.getElementById("recentSalesBody");
@@ -998,7 +1088,7 @@
                 <div style="font-size:11px; color:var(--muted);">${o.payment_method}</div>
               </td>
               <td>
-                <select onchange="window.WhipPOS.updateOrderField(${o.id}, 'payment_status', this.value)" style="height:30px; border-radius:7px; border:1px solid var(--border); background:#120e08; color:#fff; font-size:12px; padding:0 6px;">
+                <select onchange="window.WhipPOS.updateOrderField(${o.id}, 'payment_status', this.value)" style="height:30px; border-radius:7px; border:1px solid #d1d5db; background:#fff; color:#111; font-size:12px; padding:0 6px;">
                   <option value="PENDING" ${o.payment_status === "PENDING" ? "selected" : ""}>Pendiente</option>
                   <option value="PAID" ${o.payment_status === "PAID" ? "selected" : ""}>Pagado</option>
                   <option value="CANCELLED" ${o.payment_status === "CANCELLED" ? "selected" : ""}>Cancelado</option>
@@ -1006,21 +1096,21 @@
               </td>
               <td>
                 <div style="display:flex; flex-direction:column; gap:4px;">
-                  <select onchange="window.WhipPOS.updateOrderField(${o.id}, 'shipping_status', this.value)" style="height:28px; border-radius:7px; border:1px solid var(--border); background:#120e08; color:#fff; font-size:11.5px; padding:0 6px;">
+                  <select onchange="window.WhipPOS.updateOrderField(${o.id}, 'shipping_status', this.value)" style="height:28px; border-radius:7px; border:1px solid #d1d5db; background:#fff; color:#111; font-size:11.5px; padding:0 6px;">
                     <option value="UNFULFILLED" ${o.shipping_status === "UNFULFILLED" ? "selected" : ""}>Sin preparar</option>
                     <option value="PREPARING" ${o.shipping_status === "PREPARING" ? "selected" : ""}>Preparando</option>
                     <option value="SHIPPED" ${o.shipping_status === "SHIPPED" ? "selected" : ""}>Enviado</option>
                     <option value="DELIVERED" ${o.shipping_status === "DELIVERED" ? "selected" : ""}>Entregado</option>
                   </select>
                   ${ch === "WEB" ? `<div style="display:flex; gap:4px;">
-                    <input type="text" id="trk-${o.id}" value="${o.tracking_code || ""}" placeholder="Tracking..." style="width:110px; height:26px; font-size:11px; padding:0 6px; border-radius:6px; border:1px solid var(--border); background:#120e08; color:#fff;">
+                    <input type="text" id="trk-${o.id}" value="${o.tracking_code || ""}" placeholder="Tracking..." style="width:110px; height:26px; font-size:11px; padding:0 6px; border-radius:6px; border:1px solid #d1d5db; background:#fff; color:#111;">
                     <button type="button" class="btn btn-outline" style="height:26px; padding:0 6px; font-size:10.5px;" onclick="window.WhipPOS.saveTracking(${o.id})">OK</button>
                   </div>` : ""}
                 </div>
               </td>
               <td style="text-align:right; white-space:nowrap;">
                 <button type="button" class="btn btn-outline" style="height:30px; padding:0 10px; font-size:11.5px;" onclick="window.WhipPOS.reprintOrder(${o.id})">🧾 Ticket</button>
-                ${!o.stock_restored ? `<button type="button" class="btn btn-outline" style="height:30px; padding:0 10px; font-size:11.5px; border-color:#ef4444; color:#fca5a5;" onclick="window.WhipPOS.cancelOrder(${o.id})">Anular</button>` : ""}
+                ${!o.stock_restored ? `<button type="button" class="btn btn-outline" style="height:30px; padding:0 10px; font-size:11.5px; border-color:#e63946; color:#e63946;" onclick="window.WhipPOS.cancelOrder(${o.id})">Anular</button>` : ""}
               </td>
             </tr>`;
           })
@@ -1117,6 +1207,9 @@
     toggleActive,
     deleteProduct,
     openEditProduct,
+    openBarcodeModal,
+    renderBarcodePreview,
+    printBarcodes,
     uploadEditImage,
     addEditImageUrl,
     removeEditImage,
