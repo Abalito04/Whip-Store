@@ -39,30 +39,42 @@
           <div class="form-grid">
             <div class="field form-full">
               <label>Calle, altura y piso/depto *</label>
-              <input type="text" id="coAddress" required placeholder="Av. Santa Fe 2450, 4B">
+              <input type="text" id="coAddress" required placeholder="Av. San Martín 450">
             </div>
             <div class="field">
               <label>Código Postal *</label>
-              <input type="text" id="coCp" required placeholder="1425">
+              <div style="display:flex; gap:6px;">
+                <input type="text" id="coCp" required placeholder="6300" maxlength="8">
+                <button type="button" id="coQuoteBtn" class="btn btn-dark" style="height:42px; padding:0 12px; font-size:12px; white-space:nowrap;">Cotizar</button>
+              </div>
             </div>
             <div class="field">
               <label>Ciudad / Localidad *</label>
-              <input type="text" id="coCity" required placeholder="Palermo">
+              <input type="text" id="coCity" required placeholder="Santa Rosa">
             </div>
             <div class="field form-full">
               <label>Provincia *</label>
               <select id="coProvince">
+                <option>La Pampa</option>
                 <option>Buenos Aires</option>
                 <option>CABA</option>
                 <option>Córdoba</option>
                 <option>Santa Fe</option>
                 <option>Mendoza</option>
                 <option>Neuquén</option>
+                <option>Río Negro</option>
                 <option>Tucumán</option>
                 <option>Salta</option>
                 <option>Entre Ríos</option>
                 <option>Otra provincia</option>
               </select>
+            </div>
+          </div>
+
+          <div id="coShippingOptionsWrap" style="margin-top:16px; padding-top:14px; border-top:1px solid #e5e7eb;">
+            <div style="font-size:12.5px; font-weight:800; margin-bottom:8px;">🚚 Opción de envío (Correo Argentino desde Santa Rosa, La Pampa)</div>
+            <div id="coShippingOptionsList" style="font-size:12.5px; color:#6b7280;">
+              Ingresá tu Código Postal y tocá <strong>Cotizar</strong> para ver el costo exacto de Correo Argentino.
             </div>
           </div>
         </div>
@@ -109,8 +121,8 @@
             <span id="coDiscount">- $ 0</span>
           </div>
           <div style="display:flex; justify-content:space-between;">
-            <span style="color:#6b7280;">Envío</span>
-            <strong id="coShipping">GRATIS</strong>
+            <span style="color:#6b7280;">Envío (Correo Argentino)</span>
+            <strong id="coShipping">A cotizar</strong>
           </div>
           <div style="display:flex; justify-content:space-between; align-items:baseline; padding-top:10px; border-top:1px solid #e5e7eb;">
             <strong style="font-size:16px;">Total</strong>
@@ -134,6 +146,69 @@
 <script>
   (function () {
     let paymentMethod = "TRANSFERENCIA";
+    let shippingOption = "CA_DOMICILIO";
+    let shippingCost = null;
+
+    async function quoteShipping() {
+      const cp = (document.getElementById("coCp")?.value || "").replace(/\D/g, "");
+      const listEl = document.getElementById("coShippingOptionsList");
+      if (!listEl) return;
+      if (cp.length < 4) {
+        listEl.innerHTML = `<span style="color:#e63946; font-weight:700;">Ingresá un Código Postal de 4 dígitos para cotizar Correo Argentino.</span>`;
+        return;
+      }
+      listEl.innerHTML = `Cotizando Correo Argentino...`;
+      try {
+        const res = await fetch(`/api/shipping/quote?cp=${encodeURIComponent(cp)}`);
+        const data = await res.json();
+        if (!data.ok) {
+          listEl.innerHTML = `<span style="color:#e63946; font-weight:700;">${data.error}</span>`;
+          return;
+        }
+        const match = data.options.find((o) => o.code === shippingOption) || data.options[0];
+        shippingOption = match.code;
+        shippingCost = match.price;
+
+        listEl.innerHTML =
+          `<div style="font-size:11.5px; color:#6b7280; margin-bottom:8px;">Zona: <strong>${data.zone}</strong></div>` +
+          data.options
+            .map(
+              (o) => `
+            <label class="pay-option ${o.code === shippingOption ? "selected" : ""}" style="padding:10px 12px; margin-bottom:6px;">
+              <input type="radio" name="coShipOpt" value="${o.code}" data-price="${o.price}" ${o.code === shippingOption ? "checked" : ""}>
+              <div style="flex:1; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                <div>
+                  <strong style="font-size:12.5px; color:#111;">${o.name}</strong>
+                  <div style="font-size:11px; color:#6b7280;">${o.eta}</div>
+                </div>
+                <strong style="font-size:13px; color:${o.price === 0 ? "#00A650" : "#111"};">${o.price === 0 ? "Sin cargo" : window.WhipStore.formatARS(o.price)}</strong>
+              </div>
+            </label>
+          `
+            )
+            .join("");
+
+        listEl.querySelectorAll('input[name="coShipOpt"]').forEach((radio) => {
+          radio.addEventListener("change", () => {
+            shippingOption = radio.value;
+            shippingCost = parseInt(radio.dataset.price || "0", 10) || 0;
+            listEl.querySelectorAll(".pay-option").forEach((lbl) => lbl.classList.remove("selected"));
+            radio.closest(".pay-option")?.classList.add("selected");
+            renderSummary();
+          });
+        });
+
+        renderSummary();
+      } catch {
+        listEl.innerHTML = `<span style="color:#e63946;">Error cotizando envío.</span>`;
+      }
+    }
+
+    document.getElementById("coQuoteBtn")?.addEventListener("click", quoteShipping);
+    document.getElementById("coCp")?.addEventListener("blur", () => {
+      const cp = (document.getElementById("coCp")?.value || "").replace(/\D/g, "");
+      if (cp.length >= 4) quoteShipping();
+    });
 
     function renderSummary() {
       const cart = window.WhipStore.getCart();
@@ -167,15 +242,20 @@
 
       const subtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
       const discount = paymentMethod === "TRANSFERENCIA" ? Math.round(subtotal * 0.15) : 0;
-      const shipping = subtotal >= window.WhipStore.FREE_SHIPPING_THRESHOLD ? 0 : 11500;
+      const shipping = shippingCost !== null ? shippingCost : 0;
       const total = Math.max(0, subtotal - discount + shipping);
 
       document.getElementById("coSubtotal").textContent = window.WhipStore.formatARS(subtotal);
       document.getElementById("coDiscountRow").style.display = discount > 0 ? "flex" : "none";
       document.getElementById("coDiscount").textContent = "- " + window.WhipStore.formatARS(discount);
       const shipEl = document.getElementById("coShipping");
-      shipEl.textContent = shipping === 0 ? "GRATIS" : window.WhipStore.formatARS(shipping);
-      shipEl.style.color = shipping === 0 ? "#00A650" : "#111";
+      if (shippingCost === null) {
+        shipEl.textContent = "Ingresá tu CP";
+        shipEl.style.color = "#6b7280";
+      } else {
+        shipEl.textContent = shipping === 0 ? "Retiro en local ($ 0)" : window.WhipStore.formatARS(shipping);
+        shipEl.style.color = shipping === 0 ? "#00A650" : "#111";
+      }
       document.getElementById("coTotal").textContent = window.WhipStore.formatARS(total);
       document.getElementById("coSubmitBtn").textContent =
         paymentMethod === "TRANSFERENCIA"
@@ -206,6 +286,7 @@
         postal_code: document.getElementById("coCp").value,
         city: document.getElementById("coCity").value,
         province: document.getElementById("coProvince").value,
+        shipping_option: shippingOption,
         payment_method: paymentMethod,
         items: cart.map((i) => ({ variant_id: i.variant_id, quantity: i.quantity })),
       };
@@ -251,20 +332,19 @@
                 <div><strong>CBU:</strong> 0000003100084512900412</div>
                 <div><strong>Monto exacto:</strong> ${window.WhipStore.formatARS(ord.total)}</div>
               </div>
-              <a href="https://wa.me/5491100000000?text=${waText}" target="_blank" class="btn" style="width:100%; background:#25D366; color:#fff;">
-                💬 Enviar comprobante por WhatsApp
+              <a href="https://wa.me/549295454401?text=${waText}" target="_blank" class="btn" style="width:100%; background:#25D366; color:#fff;">
+                💬 Enviar comprobante por WhatsApp (2954-544001)
               </a>
             </div>
           `
               : `
             <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:12px; padding:14px; margin-bottom:20px; font-size:13px; color:#1e3a8a;">
-              <strong>Pago aprobado (Simulación Mercado Pago):</strong> Tu pedido ya figura como <strong>PAGADO</strong> en el panel de administración.
+              <strong>Pago aprobado:</strong> Recibimos tu pedido y te contactaremos para coordinar el despacho por Correo Argentino.
             </div>
           `
           }
           <div style="display:flex; gap:10px; flex-wrap:wrap;">
             <a href="/" class="btn btn-dark" style="flex:1;">Volver a la tienda</a>
-            <a href="/admin" class="btn btn-outline" style="flex:1;">Ver pedido en /admin →</a>
           </div>
         </div>
       `;

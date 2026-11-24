@@ -30,6 +30,7 @@ class Product(db.Model):
     transfer_discount = db.Column(db.Integer, default=15)
     is_active = db.Column(db.Boolean, default=True)
     is_featured = db.Column(db.Boolean, default=False)
+    is_outlet = db.Column(db.Boolean, default=False)
     category_id = db.Column(db.Integer, db.ForeignKey("categories.id"), nullable=False)
 
     # JSON / comma-separated lists stored cleanly
@@ -79,6 +80,7 @@ class Product(db.Model):
             "discount_percent": self.discount_percent,
             "is_active": self.is_active,
             "is_featured": self.is_featured,
+            "is_outlet": bool(self.is_outlet),
             "category_slug": self.category.slug if self.category else "cascos",
             "images": self.images_json or [],
             "specs": self.specs_json or {},

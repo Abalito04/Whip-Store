@@ -7,14 +7,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=6">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=7">
 </head>
 <body>
   <!-- TOP ANNOUNCEMENT BAR -->
   <div class="topbar">
     <div class="container topbar-inner">
       <button type="button" class="topbar-btn" id="topbarPrev" aria-label="Anterior">‹</button>
-      <p class="topbar-text" id="topbarText">🚚 Envío GRATIS a todo el país en compras superiores a $250.000</p>
+      <p class="topbar-text" id="topbarText">🚚 Envíos a todo el país por Correo Argentino desde Santa Rosa, La Pampa</p>
       <button type="button" class="topbar-btn" id="topbarNext" aria-label="Siguiente">›</button>
     </div>
   </div>
@@ -75,6 +75,7 @@
         <a href="/categoria/antiparras" class="{{ 'active' if request.path == '/categoria/antiparras' else '' }}">Antiparras</a>
         <a href="/categoria/indumentaria" class="{{ 'active' if request.path == '/categoria/indumentaria' else '' }}">Indumentaria</a>
         <a href="/categoria/accesorios" class="{{ 'active' if request.path == '/categoria/accesorios' else '' }}">Accesorios</a>
+        <a href="/categoria/outlet" class="{{ 'active' if request.path == '/categoria/outlet' else '' }}" style="font-weight:800;">Outlet</a>
         <a href="/categoria/ofertas" class="sale {{ 'active' if request.path == '/categoria/ofertas' else '' }}">Sale / Ofertas</a>
       </div>
     </nav>
@@ -92,6 +93,7 @@
     <a href="/categoria/antiparras">Antiparras</a>
     <a href="/categoria/indumentaria">Indumentaria</a>
     <a href="/categoria/accesorios">Accesorios</a>
+    <a href="/categoria/outlet" style="font-weight:800;">🏷️ Outlet (Usados)</a>
     <a href="/categoria/ofertas" style="color:#e63946;">Sale / Ofertas</a>
   </nav>
 
@@ -113,9 +115,9 @@
             </div>
           </div>
           <p style="font-size:12.5px; color:#9ca3af; line-height:1.6; margin:0 0 10px;">
-            Tienda oficial de cascos, antiparras e indumentaria off-road en Argentina. Stock real, envíos a todo el país y atención personalizada.
+            Tienda oficial de cascos, antiparras e indumentaria off-road en Santa Rosa, La Pampa. Stock real y envíos a todo el país por Correo Argentino.
           </p>
-          <a href="https://instagram.com" target="_blank" style="font-size:12.5px; font-weight:700; color:#fff;">📸 @whiphelmets.ar</a>
+          <a href="https://www.instagram.com/whip.helmets/" target="_blank" rel="noopener" style="font-size:12.5px; font-weight:700; color:#fff;">📸 @whip.helmets</a>
         </div>
 
         <div>
@@ -124,6 +126,7 @@
             <li><a href="/categoria/cascos">Cascos Motocross &amp; DH</a></li>
             <li><a href="/categoria/antiparras">Antiparras</a></li>
             <li><a href="/categoria/indumentaria">Indumentaria Off-Road</a></li>
+            <li><a href="/categoria/outlet">Outlet (Usados Seleccionados)</a></li>
             <li><a href="/categoria/ofertas">Sale / Ofertas</a></li>
           </ul>
         </div>
@@ -131,9 +134,9 @@
         <div>
           <h4>Contacto</h4>
           <ul>
-            <li>📞 +54 9 11 0000-0000</li>
-            <li>✉️ hola@whip-helmets.com.ar</li>
-            <li>📍 Buenos Aires, Argentina — Envíos a todo el país</li>
+            <li><a href="https://wa.me/549295454401" target="_blank" rel="noopener">📞 2954-544001 (WhatsApp)</a></li>
+            <li><a href="https://www.instagram.com/whip.helmets/" target="_blank" rel="noopener">📸 @whip.helmets</a></li>
+            <li>📍 Santa Rosa, La Pampa — Envíos a todo el país</li>
           </ul>
         </div>
 
@@ -142,11 +145,11 @@
           <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
             <span style="background:rgba(255,255,255,0.1); padding:4px 8px; border-radius:5px; font-size:11px; font-weight:700; color:#fff;">Mercado Pago</span>
             <span style="background:rgba(255,255,255,0.1); padding:4px 8px; border-radius:5px; font-size:11px; font-weight:700; color:#fff;">Visa / Mastercard</span>
-            <span style="background:rgba(255,255,255,0.1); padding:4px 8px; border-radius:5px; font-size:11px; font-weight:700; color:#fff;">Transferencia 15% OFF</span>
+            <span style="background:rgba(255,255,255,0.1); padding:4px 8px; border-radius:5px; font-size:11px; font-weight:700; color:#fff;">Transferencia / Efectivo</span>
           </div>
           <div style="display:flex; flex-wrap:wrap; gap:6px;">
             <span style="border:1px solid rgba(255,255,255,0.2); padding:4px 8px; border-radius:5px; font-size:11px;">Correo Argentino</span>
-            <span style="border:1px solid rgba(255,255,255,0.2); padding:4px 8px; border-radius:5px; font-size:11px;">Andreani</span>
+            <span style="border:1px solid rgba(255,255,255,0.2); padding:4px 8px; border-radius:5px; font-size:11px;">Retiro en Santa Rosa</span>
           </div>
         </div>
       </div>
@@ -166,8 +169,7 @@
       <button type="button" onclick="window.WhipStore.closeCart()" style="background:none; border:none; font-size:20px; cursor:pointer;">✕</button>
     </div>
     <div class="cart-progress-wrap">
-      <div id="cartFreeShippingText">🚚 Te faltan <strong>$ 250.000</strong> para envío gratis</div>
-      <div class="progress-track"><div class="progress-fill" id="cartFreeShippingFill" style="width:0%;"></div></div>
+      <div style="font-size:12px; color:#4b5563;">🚚 Envíos a todo el país por <strong>Correo Argentino</strong> (cotizás con tu CP en el checkout)</div>
     </div>
     <div class="cart-items" id="cartItemsList"></div>
     <div class="cart-foot" id="cartFooter" style="display:none;">
@@ -184,11 +186,11 @@
   </aside>
 
   <!-- FLOATING WHATSAPP -->
-  <a class="wa-float" href="https://wa.me/5491100000000?text=%C2%A1Hola%20Whip%20Store!%20Quer%C3%ADa%20consultar%20por%20un%20casco%20/%20talle." target="_blank" rel="noopener">
-    💬 <span>¿Dudas con el talle?</span>
+  <a class="wa-float" href="https://wa.me/549295454401?text=%C2%A1Hola%20Whip%20Helmets!%20Quer%C3%ADa%20consultar%20por%20un%20casco%20/%20talle." target="_blank" rel="noopener">
+    💬 <span>Consultanos por WhatsApp</span>
   </a>
 
-  <script src="{{ url_for('static', filename='js/store.js') }}?v=3"></script>
+  <script src="{{ url_for('static', filename='js/store.js') }}?v=4"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

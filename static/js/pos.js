@@ -687,9 +687,14 @@
               </td>
               <td>${variantsHtml}</td>
               <td>
-                <button type="button" class="ch-badge ${p.is_active ? "ch-WHATSAPP" : ""}" style="border:none; cursor:pointer; ${p.is_active ? "" : "background:#fee2e2;color:#b91c1c;"}" onclick="window.WhipPOS.toggleActive(${p.id}, ${!p.is_active})">
-                  ${p.is_active ? "● Activo" : "○ Pausado"}
-                </button>
+                <div style="display:flex; flex-direction:column; gap:5px; align-items:flex-start;">
+                  <button type="button" class="ch-badge ${p.is_active ? "ch-WHATSAPP" : ""}" style="border:none; cursor:pointer; ${p.is_active ? "" : "background:#fee2e2;color:#b91c1c;"}" onclick="window.WhipPOS.toggleActive(${p.id}, ${!p.is_active})">
+                    ${p.is_active ? "● Activo" : "○ Pausado"}
+                  </button>
+                  <button type="button" class="ch-badge" style="border:1px solid ${p.is_outlet ? "#111" : "#d1d5db"}; cursor:pointer; background:${p.is_outlet ? "#111" : "#f8f9fa"}; color:${p.is_outlet ? "#fff" : "#6b7280"};" onclick="window.WhipPOS.toggleOutlet(${p.id}, ${!p.is_outlet})" title="Clic para marcar o quitar de Outlet">
+                    ${p.is_outlet ? "🏷️ Outlet" : "Nuevo"}
+                  </button>
+                </div>
               </td>
               <td style="text-align:right; white-space:nowrap;">
                 <button type="button" class="btn btn-outline" style="height:30px; padding:0 9px; font-size:11.5px; margin-right:4px;" title="Generar e imprimir códigos de barras" onclick="window.WhipPOS.openBarcodeModal(${p.id})">🏷️ Códigos</button>
@@ -769,6 +774,19 @@
     }
   }
 
+  async function toggleOutlet(productId, isOutlet) {
+    const res = await fetch(`/api/admin/product/${productId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ is_outlet: isOutlet }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      toast(isOutlet ? "🏷️ Marcado como Outlet (Usado)" : "Quitado de Outlet (Nuevo)");
+      await loadState();
+    }
+  }
+
   async function deleteProduct(productId, name) {
     if (!confirm(`¿Eliminar "${name}" de la base de datos?`)) return;
     const res = await fetch(`/api/admin/product/${productId}`, { method: "DELETE" });
@@ -829,6 +847,7 @@
     document.getElementById("epComparePrice").value = p.compare_at_price || "";
     document.getElementById("epIsActive").checked = Boolean(p.is_active);
     document.getElementById("epIsFeatured").checked = Boolean(p.is_featured);
+    document.getElementById("epIsOutlet").checked = Boolean(p.is_outlet);
     document.getElementById("epDescription").value = p.description || "";
     document.getElementById("epImageUrlInput").value = "";
 
@@ -902,6 +921,7 @@
       compare_at_price: parseInt(document.getElementById("epComparePrice").value || "0", 10) || null,
       is_active: document.getElementById("epIsActive").checked,
       is_featured: document.getElementById("epIsFeatured").checked,
+      is_outlet: document.getElementById("epIsOutlet").checked,
       description: document.getElementById("epDescription").value.trim(),
       images: editImages,
       variants,
@@ -938,6 +958,7 @@
       price: parseInt(document.getElementById("pnpPrice").value || "0", 10),
       cash_price: parseInt(document.getElementById("pnpCashPrice").value || "0", 10) || null,
       color: document.getElementById("pnpColor").value.trim(),
+      is_outlet: Boolean(document.getElementById("pnpIsOutlet")?.checked),
       stock_s: parseInt(document.getElementById("pnpStockS").value || "0", 10),
       stock_m: parseInt(document.getElementById("pnpStockM").value || "0", 10),
       stock_l: parseInt(document.getElementById("pnpStockL").value || "0", 10),
@@ -1205,6 +1226,7 @@
     setVariantStock,
     savePrice,
     toggleActive,
+    toggleOutlet,
     deleteProduct,
     openEditProduct,
     openBarcodeModal,

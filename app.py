@@ -19,8 +19,74 @@ from models import (
 )
 from seed import seed_database
 
-FREE_SHIPPING_THRESHOLD = 250000
+STORE_ORIGIN_CP = "6300"
+STORE_CITY = "Santa Rosa, La Pampa"
+STORE_WHATSAPP = "549295454401"
+STORE_INSTAGRAM = "https://www.instagram.com/whip.helmets/"
 TRANSFER_DISCOUNT_PCT = 15
+
+
+def calculate_correo_argentino_quotes(postal_code):
+    """Cotizador de envíos Correo Argentino desde Santa Rosa, La Pampa (CP 6300)."""
+    cp_digits = re.sub(r"\D", "", str(postal_code or ""))
+    if len(cp_digits) < 4:
+        return None
+    cp_num = int(cp_digits[:4])
+
+    if cp_num == 6300:
+        zone = "Local (Santa Rosa, La Pampa)"
+        suc, dom, exp = 6800, 9200, None
+        eta_suc, eta_dom, eta_exp = "1 a 2 días hábiles", "1 a 2 días hábiles", ""
+    elif (6000 <= cp_num <= 6999) or (8000 <= cp_num <= 8399) or (5700 <= cp_num <= 5999):
+        zone = "Regional (La Pampa y alrededores)"
+        suc, dom, exp = 8500, 11400, 15900
+        eta_suc, eta_dom, eta_exp = "2 a 4 días hábiles", "2 a 4 días hábiles", "1 a 3 días hábiles"
+    elif (1000 <= cp_num <= 3299) or (5000 <= cp_num <= 5699) or (7000 <= cp_num <= 7699):
+        zone = "Nacional Centro (Bs. As. / CABA / Cba / Sta Fe / Mza)"
+        suc, dom, exp = 10200, 13800, 18900
+        eta_suc, eta_dom, eta_exp = "3 a 5 días hábiles", "3 a 6 días hábiles", "2 a 4 días hábiles"
+    else:
+        zone = "Nacional Larga Distancia (Patagonia / NOA / NEA)"
+        suc, dom, exp = 12600, 16500, 22800
+        eta_suc, eta_dom, eta_exp = "4 a 7 días hábiles", "5 a 8 días hábiles", "3 a 5 días hábiles"
+
+    options = [
+        {
+            "code": "CA_SUCURSAL",
+            "name": "Correo Argentino — Clásico a Sucursal",
+            "eta": eta_suc,
+            "price": suc,
+        },
+        {
+            "code": "CA_DOMICILIO",
+            "name": "Correo Argentino — Clásico a Domicilio",
+            "eta": eta_dom,
+            "price": dom,
+        },
+    ]
+    if exp is not None:
+        options.append(
+            {
+                "code": "CA_EXPRESO",
+                "name": "Correo Argentino — Expreso a Domicilio",
+                "eta": eta_exp,
+                "price": exp,
+            }
+        )
+    options.append(
+        {
+            "code": "RETIRO_LOCAL",
+            "name": "Retiro en Local — Santa Rosa, La Pampa",
+            "eta": "Coordinamos horario por WhatsApp",
+            "price": 0,
+        }
+    )
+    return {
+        "origin": f"{STORE_CITY} (CP {STORE_ORIGIN_CP})",
+        "postal_code": cp_digits[:4],
+        "zone": zone,
+        "options": options,
+    }
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "whip-store-dev-secret-2026")
@@ -54,6 +120,8 @@ def ensure_schema_updates():
         prod_cols = {c["name"] for c in inspector.get_columns("products")}
         if "cash_price" not in prod_cols:
             db.session.execute(text("ALTER TABLE products ADD COLUMN cash_price INTEGER"))
+        if "is_outlet" not in prod_cols:
+            db.session.execute(text("ALTER TABLE products ADD COLUMN is_outlet BOOLEAN DEFAULT FALSE"))
     db.session.commit()
 
 
@@ -91,8 +159,10 @@ def format_ars(value):
 @app.context_processor
 def inject_globals():
     return {
-        "FREE_SHIPPING_THRESHOLD": FREE_SHIPPING_THRESHOLD,
         "TRANSFER_DISCOUNT_PCT": TRANSFER_DISCOUNT_PCT,
+        "STORE_CITY": STORE_CITY,
+        "STORE_WHATSAPP": STORE_WHATSAPP,
+        "STORE_INSTAGRAM": STORE_INSTAGRAM,
     }
 
 
@@ -125,12 +195,15 @@ def categoria(slug):
         "antiparras": ("Antiparras", "Visión cristalina en barro y polvo con lentes de alta definición."),
         "indumentaria": ("Indumentaria", "Jerseys, pantalones y equipamiento técnico para pista y enduro."),
         "accesorios": ("Accesorios", "Complementos esenciales para el cuidado de tu equipamiento."),
-        "ofertas": ("Sale / Ofertas", "Productos seleccionados con descuento especial y envío gratis."),
+        "outlet": ("Outlet · Usados Seleccionados", "Cascos y equipamiento usado verificado por Whip Store al mejor precio."),
+        "ofertas": ("Sale / Ofertas", "Productos seleccionados con descuento especial y envíos por Correo Argentino."),
     }
     title, subtitle = meta_map.get(slug, ("Catálogo", "Todos los productos disponibles en Whip Store."))
 
     query = Product.query.filter_by(is_active=True)
-    if slug == "ofertas":
+    if slug == "outlet":
+        query = query.filter(Product.is_outlet.is_(True))
+    elif slug == "ofertas":
         query = query.filter(Product.compare_at_price.isnot(None), Product.compare_at_price > Product.price)
     elif slug != "todos":
         cat = Category.query.filter_by(slug=slug).first()
@@ -239,6 +312,15 @@ def api_products():
     return jsonify([p.to_dict() for p in products])
 
 
+@app.route("/api/shipping/quote")
+def api_shipping_quote():
+    cp = (request.args.get("cp") or "").strip()
+    quote = calculate_correo_argentino_quotes(cp)
+    if not quote:
+        return jsonify({"ok": False, "error": "Ingresá un código postal válido de 4 dígitos (ej: 6300, 1425, 5000)."}), 400
+    return jsonify({"ok": True, **quote})
+
+
 @app.route("/api/checkout", methods=["POST"])
 def api_checkout():
     data = request.get_json(silent=True) or {}
@@ -296,7 +378,13 @@ def api_checkout():
             )
         else:
             discount_amount = 0
-        shipping_cost = 0 if subtotal >= FREE_SHIPPING_THRESHOLD else 11500
+        shipping_option = str(data.get("shipping_option") or "CA_DOMICILIO").strip().upper()
+        quote = calculate_correo_argentino_quotes(data.get("postal_code"))
+        if quote:
+            opt_match = next((o for o in quote["options"] if o["code"] == shipping_option), None)
+            shipping_cost = opt_match["price"] if opt_match else quote["options"][1]["price"]
+        else:
+            shipping_cost = 0 if shipping_option == "RETIRO_LOCAL" else 13800
         total = max(0, subtotal - discount_amount + shipping_cost)
 
         last_order = Order.query.order_by(Order.order_number.desc()).first()
@@ -506,6 +594,8 @@ def api_admin_product(product_id):
             product.is_active = bool(data["is_active"])
         if "is_featured" in data:
             product.is_featured = bool(data["is_featured"])
+        if "is_outlet" in data:
+            product.is_outlet = bool(data["is_outlet"])
         if "images" in data and isinstance(data["images"], list):
             cleaned_imgs = [str(u).strip() for u in data["images"] if str(u).strip()]
             product.images_json = cleaned_imgs
@@ -604,6 +694,7 @@ def api_admin_create_product():
         transfer_discount=15,
         is_active=True,
         is_featured=True,
+        is_outlet=bool(data.get("is_outlet", False)),
         description="Producto cargado desde el gestor Whip POS.",
         images_json=[
             "/static/images/cascos/Fox-V1-Rojo frontal.png",

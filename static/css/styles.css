@@ -534,6 +534,7 @@ button, input, select {
   color: #fff;
 }
 .badge-sale { background: var(--danger); }
+.badge-outlet { background: #111111; color: #ffffff; }
 .badge-free { background: var(--cta); }
 .badge-low { background: #f59e0b; }
 .badge-out { background: #374151; }

@@ -1,12 +1,11 @@
 (function () {
   const CART_KEY = "whip_py_cart_v1";
-  const FREE_SHIPPING_THRESHOLD = 250000;
   const TRANSFER_DISCOUNT_PCT = 15;
 
   const ANNOUNCEMENTS = [
-    "🚚 Envío GRATIS a todo el país en compras superiores a $250.000",
+    "🚚 Envíos a todo el país por Correo Argentino desde Santa Rosa, La Pampa",
     "💳 Hasta 6 CUOTAS SIN INTERÉS con todas las tarjetas",
-    "💸 15% OFF abonando por Transferencia Bancaria",
+    "💸 Descuento especial abonando por Transferencia o Efectivo",
   ];
 
   function formatARS(amount) {
@@ -108,20 +107,6 @@
     const headerTotal = document.getElementById("headerCartTotal");
     if (badge) badge.textContent = String(totalCount);
     if (headerTotal) headerTotal.textContent = formatARS(subtotal);
-
-    // Progress bar
-    const progressText = document.getElementById("cartFreeShippingText");
-    const progressFill = document.getElementById("cartFreeShippingFill");
-    if (progressText && progressFill) {
-      const missing = Math.max(0, FREE_SHIPPING_THRESHOLD - subtotal);
-      const pct = Math.min(100, (subtotal / FREE_SHIPPING_THRESHOLD) * 100);
-      progressFill.style.width = `${pct}%`;
-      if (subtotal > 0 && missing === 0) {
-        progressText.innerHTML = `<span style="color:#00A650">🎉 ¡Genial! Tenés <strong>ENVÍO GRATIS</strong> a todo el país</span>`;
-      } else {
-        progressText.innerHTML = `🚚 Te faltan <strong>${formatARS(missing)}</strong> para <span style="color:#00A650">envío gratis</span>`;
-      }
-    }
 
     const listEl = document.getElementById("cartItemsList");
     const footEl = document.getElementById("cartFooter");
@@ -333,7 +318,6 @@
     closeCart,
     selectCardSize,
     quickAddFromCard,
-    FREE_SHIPPING_THRESHOLD,
     TRANSFER_DISCOUNT_PCT,
   };
 

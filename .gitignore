@@ -7,3 +7,5 @@ instance/
 *.sqlite3
 .env
 .DS_Store
+*.csv
+import_csv.py

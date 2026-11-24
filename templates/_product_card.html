@@ -8,11 +8,11 @@
       {% if total_stock == 0 %}
         <span class="badge badge-out">Sin stock</span>
       {% else %}
+        {% if product.is_outlet %}
+          <span class="badge badge-outlet">Outlet · Usado</span>
+        {% endif %}
         {% if product.discount_percent %}
           <span class="badge badge-sale">{{ product.discount_percent }}% OFF</span>
-        {% endif %}
-        {% if product.price >= FREE_SHIPPING_THRESHOLD %}
-          <span class="badge badge-free">Envío gratis</span>
         {% endif %}
         {% if total_stock <= 2 %}
           <span class="badge badge-low">Últimas unidades</span>
