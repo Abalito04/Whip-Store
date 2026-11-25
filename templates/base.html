@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=12">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=18">
 </head>
 <body>
   <!-- TOP ANNOUNCEMENT BAR -->
@@ -73,7 +73,14 @@
         <a href="/" class="{{ 'active' if request.path == '/' else '' }}">Inicio</a>
         <a href="/categoria/cascos" class="{{ 'active' if request.path == '/categoria/cascos' else '' }}">Cascos</a>
         <a href="/categoria/antiparras" class="{{ 'active' if request.path == '/categoria/antiparras' else '' }}">Gafas / Antiparras</a>
-        <a href="/categoria/indumentaria" class="{{ 'active' if request.path == '/categoria/indumentaria' else '' }}">Indumentaria</a>
+        <div class="nav-dropdown">
+          <a href="/categoria/indumentaria" class="{{ 'active' if request.path.startswith('/categoria/indumentaria') else '' }}">Indumentaria ▾</a>
+          <div class="nav-dropdown-menu">
+            <a href="/categoria/indumentaria">Ver toda la Indumentaria</a>
+            <a href="/categoria/indumentaria-casual">Casual / Informal</a>
+            <a href="/categoria/indumentaria-competicion">Competición</a>
+          </div>
+        </div>
         <a href="/categoria/accesorios" class="{{ 'active' if request.path == '/categoria/accesorios' else '' }}">Accesorios</a>
         <a href="/categoria/outlet" class="sale {{ 'active' if request.path == '/categoria/outlet' else '' }}" style="font-weight:800;">Outlet</a>
       </div>
@@ -91,6 +98,8 @@
     <a href="/categoria/cascos">Cascos</a>
     <a href="/categoria/antiparras">Gafas / Antiparras</a>
     <a href="/categoria/indumentaria">Indumentaria</a>
+    <a href="/categoria/indumentaria-casual" style="padding-left:28px; font-size:13px; color:#4b5563;">↳ Casual / Informal</a>
+    <a href="/categoria/indumentaria-competicion" style="padding-left:28px; font-size:13px; color:#4b5563;">↳ Competición</a>
     <a href="/categoria/accesorios">Accesorios</a>
     <a href="/categoria/outlet" style="color:#e63946; font-weight:800;">🏷️ Outlet</a>
   </nav>

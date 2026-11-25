@@ -842,6 +842,10 @@
     document.getElementById("epName").value = p.name || "";
     document.getElementById("epBrand").value = p.brand || "";
     document.getElementById("epCategory").value = p.category_slug || "cascos";
+    const epSubField = document.getElementById("epSubcatField");
+    if (epSubField) epSubField.style.display = (p.category_slug === "indumentaria") ? "block" : "none";
+    const epSubSel = document.getElementById("epSubcategory");
+    if (epSubSel) epSubSel.value = p.subcategory || "competicion";
     document.getElementById("epPrice").value = p.price || 0;
     document.getElementById("epCashPrice").value = p.cash_price || p.transfer_price || "";
     document.getElementById("epComparePrice").value = p.compare_at_price || "";
@@ -916,6 +920,7 @@
       name: document.getElementById("epName").value.trim(),
       brand: document.getElementById("epBrand").value.trim(),
       category_slug: document.getElementById("epCategory").value,
+      subcategory: document.getElementById("epCategory").value === "indumentaria" ? (document.getElementById("epSubcategory")?.value || "competicion") : "",
       price: parseInt(document.getElementById("epPrice").value || "0", 10) || 0,
       cash_price: parseInt(document.getElementById("epCashPrice").value || "0", 10) || null,
       compare_at_price: parseInt(document.getElementById("epComparePrice").value || "0", 10) || null,
@@ -955,6 +960,7 @@
       name: document.getElementById("pnpName").value.trim(),
       brand: document.getElementById("pnpBrand").value.trim(),
       category_slug: document.getElementById("pnpCategory").value,
+      subcategory: document.getElementById("pnpCategory").value === "indumentaria" ? (document.getElementById("pnpSubcategory")?.value || "competicion") : "",
       price: parseInt(document.getElementById("pnpPrice").value || "0", 10),
       cash_price: parseInt(document.getElementById("pnpCashPrice").value || "0", 10) || null,
       color: document.getElementById("pnpColor").value.trim(),

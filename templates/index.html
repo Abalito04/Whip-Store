@@ -121,6 +121,16 @@
     </div>
 
     <div id="homeBrandDrawer" style="display:none; margin:-6px 0 18px; padding:12px 14px; background:#f8f9fa; border:1px solid #e5e7eb; border-radius:11px;">
+      <div id="homeSubcatWrap" style="display:none; margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid #e5e7eb;">
+        <div style="font-size:11px; font-weight:800; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">
+          Tipo de Indumentaria
+        </div>
+        <div class="filter-pills" id="homeSubcatPills" style="margin-bottom:0;">
+          <button type="button" class="pill-btn active" data-sub="">Todas</button>
+          <button type="button" class="pill-btn" data-sub="casual">Casual / Informal</button>
+          <button type="button" class="pill-btn" data-sub="competicion">Competición</button>
+        </div>
+      </div>
       <div style="font-size:11.5px; font-weight:800; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">
         Filtrar por marca en <span id="homeBrandDrawerTitle" style="color:#111;"></span>
       </div>
@@ -149,6 +159,8 @@
     const brandDrawer = document.getElementById("homeBrandDrawer");
     const brandDrawerTitle = document.getElementById("homeBrandDrawerTitle");
     const brandPillsWrap = document.getElementById("homeBrandPills");
+    const subcatWrap = document.getElementById("homeSubcatWrap");
+    const subcatPills = document.querySelectorAll("#homeSubcatPills .pill-btn");
     const sortSelect = document.getElementById("homeSortSelect");
     if (!grid) return;
 
@@ -165,13 +177,18 @@
     });
 
     let currentCat = "todas";
+    let currentSubcat = "";
     let currentBrand = "Todas";
     let currentPage = 1;
 
     function matchesCategory(card, cat) {
       if (cat === "todas") return true;
       if (cat === "outlet") return card.dataset.outlet === "true";
-      return card.dataset.category === cat;
+      if (card.dataset.category !== cat) return false;
+      if (cat === "indumentaria" && currentSubcat) {
+        return card.dataset.subcategory === currentSubcat;
+      }
+      return true;
     }
 
     function renderBrandDrawer() {
@@ -179,6 +196,9 @@
       if (currentCat === "todas") {
         brandDrawer.style.display = "none";
         return;
+      }
+      if (subcatWrap) {
+        subcatWrap.style.display = currentCat === "indumentaria" ? "block" : "none";
       }
       const catCards = allCards.filter((c) => matchesCategory(c, currentCat));
       const brands = Array.from(new Set(catCards.map((c) => c.dataset.brand).filter(Boolean))).sort();
@@ -278,6 +298,20 @@
         catPills.forEach((b) => b.classList.remove("active"));
         btn.classList.add("active");
         currentCat = btn.dataset.cat;
+        currentSubcat = "";
+        subcatPills.forEach((b) => b.classList.toggle("active", b.dataset.sub === ""));
+        currentBrand = "Todas";
+        currentPage = 1;
+        renderBrandDrawer();
+        renderCatalog(false);
+      });
+    });
+
+    subcatPills.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        subcatPills.forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        currentSubcat = btn.dataset.sub || "";
         currentBrand = "Todas";
         currentPage = 1;
         renderBrandDrawer();

@@ -12,13 +12,14 @@
   <div class="pdp-grid">
     <!-- GALERÍA -->
     <div>
-      <div class="pdp-main-img">
+      <div class="pdp-main-img" id="pdpMainImgBox" title="Clic para abrir la galería">
         {% if product.discount_percent %}
           <span class="badge badge-sale" style="position:absolute; top:14px; left:14px; z-index:2; font-size:12px; padding:5px 10px;">
             {{ product.discount_percent }}% OFF
           </span>
         {% endif %}
         <img id="pdpMainImg" src="{{ imgs[0] }}" alt="{{ product.name }}">
+        <span class="pdp-zoom-hint">🔍 Ver fotos</span>
       </div>
 
       {% if imgs|length > 1 %}
@@ -105,10 +106,22 @@
       <h2 style="font-size:18px; font-weight:800; margin:0 0 12px;">Ficha Técnica</h2>
       <div class="specs-table">
         {% for k, val in (product.specs_json or {}).items() %}
-          <div class="specs-row">
-            <strong style="color:#4b5563;">{{ k }}</strong>
-            <span>{{ val }}</span>
-          </div>
+          {% if val is string and 'instagram.com' in val %}
+            <div class="specs-row" style="grid-template-columns: 1fr;">
+              <a href="{{ val }}" target="_blank" rel="noopener" style="color:#111; font-weight:700; text-decoration:underline;">
+                📸 Ver publicación en Instagram ↗
+              </a>
+            </div>
+          {% else %}
+            <div class="specs-row">
+              <strong style="color:#4b5563;">{{ k }}</strong>
+              {% if val is string and (val.startswith('http://') or val.startswith('https://')) %}
+                <a href="{{ val }}" target="_blank" rel="noopener" style="color:#111; font-weight:700; text-decoration:underline; word-break:break-all;">{{ val }}</a>
+              {% else %}
+                <span>{{ val }}</span>
+              {% endif %}
+            </div>
+          {% endif %}
         {% endfor %}
       </div>
     </div>
@@ -125,6 +138,37 @@
     </div>
   </section>
   {% endif %}
+</div>
+
+<!-- MODAL MINI GALERÍA -->
+<div class="modal-backdrop" id="pdpGalleryModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="gallery-modal-box">
+    <div class="cart-head">
+      <div>
+        <h2 style="margin:0; font-size:15px;">{{ product.name }}</h2>
+        <span id="galleryCounter" style="font-size:11.5px; color:#6b7280; font-weight:700;">1 / {{ imgs|length }}</span>
+      </div>
+      <button type="button" onclick="document.getElementById('pdpGalleryModal').classList.remove('open')" style="background:none; border:none; font-size:20px; cursor:pointer;">✕</button>
+    </div>
+    <div class="gallery-stage">
+      {% if imgs|length > 1 %}
+        <button type="button" class="gallery-nav-btn prev" id="galleryPrev" aria-label="Foto anterior">‹</button>
+      {% endif %}
+      <img id="galleryModalImg" src="{{ imgs[0] }}" alt="{{ product.name }}">
+      {% if imgs|length > 1 %}
+        <button type="button" class="gallery-nav-btn next" id="galleryNext" aria-label="Foto siguiente">›</button>
+      {% endif %}
+    </div>
+    {% if imgs|length > 1 %}
+      <div class="gallery-thumbs" id="galleryThumbs">
+        {% for img in imgs %}
+          <button type="button" class="gallery-thumb {{ 'active' if loop.first else '' }}" data-index="{{ loop.index0 }}">
+            <img src="{{ img }}" alt="{{ product.name }} miniatura {{ loop.index }}">
+          </button>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
 </div>
 
 <!-- MODAL GUÍA DE TALLES -->
@@ -160,14 +204,44 @@
     const product = {{ product_dict | tojson }};
     let selectedVariant = product.variants.find((v) => v.stock > 0) || product.variants[0];
 
-    // Galería de miniaturas
+    // Galería de miniaturas + Mini Galería Lightbox al clickear la imagen
     const mainImg = document.getElementById("pdpMainImg");
-    document.querySelectorAll(".pdp-thumb").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        document.querySelectorAll(".pdp-thumb").forEach((b) => b.classList.remove("active"));
-        btn.classList.add("active");
-        mainImg.src = btn.dataset.img;
-      });
+    const mainImgBox = document.getElementById("pdpMainImgBox");
+    const galleryModal = document.getElementById("pdpGalleryModal");
+    const galleryModalImg = document.getElementById("galleryModalImg");
+    const galleryCounter = document.getElementById("galleryCounter");
+    const allImgs = product.images && product.images.length ? product.images : [mainImg.src];
+    let currentImgIdx = 0;
+
+    function syncMainImage(idx) {
+      currentImgIdx = (idx + allImgs.length) % allImgs.length;
+      mainImg.src = allImgs[currentImgIdx];
+      document.querySelectorAll(".pdp-thumb").forEach((b, i) => b.classList.toggle("active", i === currentImgIdx));
+      if (galleryModalImg) galleryModalImg.src = allImgs[currentImgIdx];
+      if (galleryCounter) galleryCounter.textContent = `${currentImgIdx + 1} / ${allImgs.length}`;
+      document.querySelectorAll("#galleryThumbs .gallery-thumb").forEach((b, i) => b.classList.toggle("active", i === currentImgIdx));
+    }
+
+    document.querySelectorAll(".pdp-thumb").forEach((btn, idx) => {
+      btn.addEventListener("click", () => syncMainImage(idx));
+    });
+
+    mainImgBox?.addEventListener("click", () => {
+      syncMainImage(currentImgIdx);
+      galleryModal?.classList.add("open");
+    });
+
+    document.getElementById("galleryPrev")?.addEventListener("click", () => syncMainImage(currentImgIdx - 1));
+    document.getElementById("galleryNext")?.addEventListener("click", () => syncMainImage(currentImgIdx + 1));
+    document.querySelectorAll("#galleryThumbs .gallery-thumb").forEach((btn) => {
+      btn.addEventListener("click", () => syncMainImage(Number(btn.dataset.index) || 0));
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (!galleryModal?.classList.contains("open")) return;
+      if (e.key === "Escape") galleryModal.classList.remove("open");
+      if (e.key === "ArrowLeft") syncMainImage(currentImgIdx - 1);
+      if (e.key === "ArrowRight") syncMainImage(currentImgIdx + 1);
     });
 
     function renderVariantState() {

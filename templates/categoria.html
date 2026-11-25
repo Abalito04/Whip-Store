@@ -6,13 +6,21 @@
     <a href="/">Inicio</a> › <strong>{{ title }}</strong>
   </nav>
 
-  <div class="cat-banner" style="height:150px; margin-bottom:10px; cursor:default;">
+  <div class="cat-banner cat-banner-header">
     <img src="{{ url_for('static', filename='images/banner2.png') }}" alt="{{ title }}" style="pointer-events:none;">
     <div class="cat-banner-content" style="width:100%; display:flex; justify-content:space-between; align-items:flex-end; gap:12px;">
       <h1 style="margin:0; font-size:28px; font-weight:800; color:#fff;">{{ title }}</h1>
       <span style="font-size:12.5px; font-weight:700; color:#e5e7eb; white-space:nowrap;">{{ products|length }} producto(s)</span>
     </div>
   </div>
+
+  {% if slug.startswith('indumentaria') %}
+    <div class="filter-pills" style="margin:12px 0 4px;">
+      <a href="/categoria/indumentaria" class="pill-btn {{ 'active' if slug == 'indumentaria' else '' }}">Toda la Indumentaria</a>
+      <a href="/categoria/indumentaria-casual" class="pill-btn {{ 'active' if slug == 'indumentaria-casual' else '' }}">Casual / Informal</a>
+      <a href="/categoria/indumentaria-competicion" class="pill-btn {{ 'active' if slug == 'indumentaria-competicion' else '' }}">Competición</a>
+    </div>
+  {% endif %}
 
   <!-- Filtros en una sola línea (desktop y mobile) -->
   <form method="GET" class="cat-filters-bar">

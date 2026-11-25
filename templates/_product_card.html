@@ -1,9 +1,8 @@
 {% set total_stock = product.total_stock %}
 {% set imgs = product.images_json or [] %}
-{% set has_second = imgs|length > 1 %}
 {% set in_stock_variants = product.variants | selectattr('stock', 'gt', 0) | list %}
-<article class="product-card" data-brand="{{ product.brand }}" data-price="{{ product.price }}" data-category="{{ product.category.slug if product.category else 'cascos' }}" data-outlet="{{ 'true' if product.is_outlet else 'false' }}">
-  <a href="/producto/{{ product.slug }}" class="card-media {{ 'has-second' if has_second else '' }}">
+<article class="product-card" data-brand="{{ product.brand }}" data-price="{{ product.price }}" data-category="{{ product.category.slug if product.category else 'cascos' }}" data-subcategory="{{ product.subcategory or '' }}" data-outlet="{{ 'true' if product.is_outlet else 'false' }}">
+  <a href="/producto/{{ product.slug }}" class="card-media">
     <div class="card-badges">
       {% if total_stock == 0 %}
         <span class="badge badge-out">Sin stock</span>
@@ -21,9 +20,6 @@
     </div>
 
     <img class="primary" src="{{ imgs[0] if imgs else '/static/images/cat-cascos.jpg' }}" alt="{{ product.name }}" style="{{ 'opacity:0.5; filter:grayscale(1);' if total_stock == 0 else '' }}">
-    {% if has_second %}
-      <img class="secondary" src="{{ imgs[1] }}" alt="{{ product.name }} vista lateral">
-    {% endif %}
   </a>
 
   <div class="card-body">

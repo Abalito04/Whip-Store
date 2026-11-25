@@ -382,13 +382,20 @@
           <div class="field"><label>Marca</label><input type="text" id="pnpBrand" value="Fox"></div>
           <div class="field">
             <label>Categoría</label>
-            <select id="pnpCategory">
+            <select id="pnpCategory" onchange="document.getElementById('pnpSubcatField').style.display = this.value === 'indumentaria' ? 'block' : 'none'">
               <option value="cascos">Cascos</option>
               <option value="antiparras">Gafas / Antiparras</option>
               <option value="indumentaria">Indumentaria</option>
               <option value="accesorios">Accesorios</option>
             </select>
           </div>
+        </div>
+        <div class="field" id="pnpSubcatField" style="display:none;">
+          <label>Subcategoría de Indumentaria</label>
+          <select id="pnpSubcategory">
+            <option value="competicion">Competición</option>
+            <option value="casual">Casual / Informal</option>
+          </select>
         </div>
         <div class="form-grid">
           <div class="field"><label>Precio Lista / Tarjetas (ARS) *</label><input type="number" id="pnpPrice" value="350000" required></div>
@@ -429,13 +436,20 @@
           <div class="field"><label>Marca *</label><input type="text" id="epBrand" required></div>
           <div class="field">
             <label>Categoría</label>
-            <select id="epCategory">
+            <select id="epCategory" onchange="document.getElementById('epSubcatField').style.display = this.value === 'indumentaria' ? 'block' : 'none'">
               <option value="cascos">Cascos</option>
               <option value="antiparras">Gafas / Antiparras</option>
               <option value="indumentaria">Indumentaria</option>
               <option value="accesorios">Accesorios</option>
             </select>
           </div>
+        </div>
+        <div class="field" id="epSubcatField" style="display:none;">
+          <label>Subcategoría de Indumentaria</label>
+          <select id="epSubcategory">
+            <option value="competicion">Competición</option>
+            <option value="casual">Casual / Informal</option>
+          </select>
         </div>
         <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px;">
           <div class="field"><label>Precio Lista / Tarjetas *</label><input type="number" id="epPrice" min="0" required></div>
@@ -575,6 +589,6 @@
   <div id="posToast" class="pos-toast"></div>
 {% endif %}
 
-<script src="{{ url_for('static', filename='js/pos.js') }}?v=8"></script>
+<script src="{{ url_for('static', filename='js/pos.js') }}?v=9"></script>
 </body>
 </html>

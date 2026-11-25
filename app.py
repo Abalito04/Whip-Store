@@ -122,6 +122,8 @@ def ensure_schema_updates():
             db.session.execute(text("ALTER TABLE products ADD COLUMN cash_price INTEGER"))
         if "is_outlet" not in prod_cols:
             db.session.execute(text("ALTER TABLE products ADD COLUMN is_outlet BOOLEAN DEFAULT FALSE"))
+        if "subcategory" not in prod_cols:
+            db.session.execute(text("ALTER TABLE products ADD COLUMN subcategory VARCHAR(40) DEFAULT ''"))
     if "categories" in tables:
         db.session.execute(text("UPDATE categories SET name = 'Gafas / Antiparras' WHERE slug = 'antiparras'"))
         db.session.execute(
@@ -213,14 +215,23 @@ def categoria(slug):
         "cascos": ("Cascos", ""),
         "antiparras": ("Gafas / Antiparras", ""),
         "indumentaria": ("Indumentaria", ""),
+        "indumentaria-casual": ("Indumentaria · Casual / Informal", ""),
+        "indumentaria-competicion": ("Indumentaria · Competición", ""),
         "accesorios": ("Accesorios", ""),
         "outlet": ("Outlet", ""),
     }
-    title, subtitle = meta_map.get(slug, ("Catálogo", "Todos los productos disponibles en Whip Store."))
+    title, subtitle = meta_map.get(slug, ("Catálogo", ""))
 
     query = Product.query.filter_by(is_active=True)
     if slug == "outlet":
         query = query.filter(Product.is_outlet.is_(True))
+    elif slug in ("indumentaria-casual", "indumentaria-competicion"):
+        sub_val = "casual" if slug == "indumentaria-casual" else "competicion"
+        cat = Category.query.filter_by(slug="indumentaria").first()
+        if cat:
+            query = query.filter_by(category_id=cat.id, subcategory=sub_val)
+        else:
+            query = query.filter(False)
     elif slug == "ofertas":
         query = query.filter(Product.compare_at_price.isnot(None), Product.compare_at_price > Product.price)
     elif slug != "todos":
@@ -621,6 +632,8 @@ def api_admin_product(product_id):
             product.is_featured = bool(data["is_featured"])
         if "is_outlet" in data:
             product.is_outlet = bool(data["is_outlet"])
+        if "subcategory" in data:
+            product.subcategory = str(data["subcategory"] or "").strip().lower()
         if "images" in data and isinstance(data["images"], list):
             cleaned_imgs = [str(u).strip() for u in data["images"] if str(u).strip()]
             product.images_json = cleaned_imgs
@@ -720,6 +733,7 @@ def api_admin_create_product():
         is_active=True,
         is_featured=True,
         is_outlet=bool(data.get("is_outlet", False)),
+        subcategory=str(data.get("subcategory") or "").strip().lower(),
         description="Producto cargado desde el gestor Whip POS.",
         images_json=[
             "/static/images/cascos/Fox-V1-Rojo frontal.png",
