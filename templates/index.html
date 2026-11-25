@@ -3,19 +3,44 @@
 
 <!-- HERO BANNER -->
 <section class="hero">
-  <img class="hero-bg" src="{{ url_for('static', filename='images/header-bg.jpg') }}" alt="Whip Store Motocross">
+  <img class="hero-bg" src="{{ url_for('static', filename='images/banner.png') }}" alt="Whip Store Motocross">
   <div class="hero-overlay"></div>
   <div class="container">
     <div class="hero-content">
-      <span class="hero-pill">🛡️ Tienda Online Oficial · Stock Real en Argentina</span>
-      <h1>Tu próximo casco, en 6 cuotas sin interés.</h1>
-      <p>
-        Troy Lee Designs, Bell, Fox, Alpinestars y Airoh con stock verificado por talle,
-        descuento por transferencia bancaria y envíos a todo el país por Correo Argentino.
-      </p>
+      <div class="hero-slides" id="heroSlides">
+        <div class="hero-slide active">
+          <span class="hero-pill">🛡️ Tienda Online Oficial · Stock Real en Argentina</span>
+          <h1>Tu próximo casco, en 6 cuotas sin interés.</h1>
+          <p>
+            Troy Lee Designs, Bell, Fox, Alpinestars y Airoh con stock verificado por talle
+            y envíos a todo el país por Correo Argentino.
+          </p>
+        </div>
+        <div class="hero-slide">
+          <span class="hero-pill">💸 Precio Especial Efectivo / Transferencia</span>
+          <h1>Ahorrá abonando por transferencia o efectivo.</h1>
+          <p>
+            Precios directos con descuento real en toda la tienda. Comprá online
+            o retirá por nuestro local en Santa Rosa, La Pampa.
+          </p>
+        </div>
+        <div class="hero-slide">
+          <span class="hero-pill">🏷️ Sección Outlet · Usados Seleccionados</span>
+          <h1>Cascos usados verificados al mejor precio.</h1>
+          <p>
+            Explorá nuestro Outlet con equipamiento revisado y listo para pista,
+            con despacho a todo el país desde Santa Rosa, La Pampa.
+          </p>
+        </div>
+      </div>
       <div class="hero-btns">
         <a href="#catalogo" class="btn btn-cta">COMPRAR AHORA →</a>
         <a href="/categoria/outlet" class="btn btn-ghost-light">Ver Outlet</a>
+      </div>
+      <div class="hero-dots" id="heroDots" aria-label="Cambiar texto destacado">
+        <button type="button" class="hero-dot active" data-slide="0" aria-label="Texto 1"></button>
+        <button type="button" class="hero-dot" data-slide="1" aria-label="Texto 2"></button>
+        <button type="button" class="hero-dot" data-slide="2" aria-label="Texto 3"></button>
       </div>
     </div>
   </div>
@@ -60,10 +85,9 @@
   <div class="container cat-banners">
     {% for cat in categories %}
       <a href="/categoria/{{ cat.slug }}" class="cat-banner">
-        <img src="{{ cat.image_url }}" alt="{{ cat.name }}">
+        <img src="{{ url_for('static', filename='images/banner2.png') }}" alt="{{ cat.name }}">
         <div class="cat-banner-content">
           <h3>{{ cat.name }}</h3>
-          <p>{{ cat.description }}</p>
           <span>Ver categoría →</span>
         </div>
       </a>
@@ -77,7 +101,7 @@
     <div class="section-head">
       <div>
         <span class="section-eyebrow" style="color:#9ca3af;">Catálogo completo</span>
-        <h2 class="section-title">Stock disponible hoy</h2>
+        <h2 class="section-title">Stock disponible</h2>
       </div>
       <div>
         <select id="homeSortSelect" style="height:38px; padding:0 12px; border-radius:8px; border:1px solid #e5e7eb; font-size:12.5px; font-weight:700; background:#fff; color:#111;">
@@ -88,11 +112,19 @@
       </div>
     </div>
 
-    <div class="filter-pills" id="homeBrandPills">
-      <button type="button" class="pill-btn active" data-brand="Todas">Todas</button>
-      {% for brand in brands %}
-        <button type="button" class="pill-btn" data-brand="{{ brand }}">{{ brand }}</button>
-      {% endfor %}
+    <div class="filter-pills" id="homeCategoryPills">
+      <button type="button" class="pill-btn active" data-cat="todas">Todas</button>
+      <button type="button" class="pill-btn" data-cat="cascos">Cascos</button>
+      <button type="button" class="pill-btn" data-cat="indumentaria">Indumentaria</button>
+      <button type="button" class="pill-btn" data-cat="antiparras">Gafas / Antiparras</button>
+      <button type="button" class="pill-btn" data-cat="outlet" style="color:#e63946; border-color:#fecaca;">Outlet</button>
+    </div>
+
+    <div id="homeBrandDrawer" style="display:none; margin:-6px 0 18px; padding:12px 14px; background:#f8f9fa; border:1px solid #e5e7eb; border-radius:11px;">
+      <div style="font-size:11.5px; font-weight:800; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">
+        Filtrar por marca en <span id="homeBrandDrawerTitle" style="color:#111;"></span>
+      </div>
+      <div class="filter-pills" id="homeBrandPills" style="margin-bottom:0;"></div>
     </div>
 
     <div class="product-grid" id="homeCatalogGrid">
@@ -100,21 +132,8 @@
         {% include "_product_card.html" %}
       {% endfor %}
     </div>
-  </div>
-</section>
 
-<!-- COMUNIDAD INSTAGRAM -->
-<section style="background:#f8f9fa; border-top:1px solid #e5e7eb; border-bottom:1px solid #e5e7eb; padding:48px 0;">
-  <div class="container" style="text-align:center;">
-    <span class="section-eyebrow" style="color:#6b7280;">📸 Comunidad Whip</span>
-    <h2 class="section-title"><a href="https://www.instagram.com/whip.helmets/" target="_blank" rel="noopener">Riders en pista con @whip.helmets</a></h2>
-    <p style="font-size:14px; color:#6b7280; margin:6px 0 28px;">Seguinos en <a href="https://www.instagram.com/whip.helmets/" target="_blank" rel="noopener" style="text-decoration:underline; font-weight:700; color:#111;">@whip.helmets</a> para ver ingresos nuevos y stock al día.</p>
-    <div class="product-grid">
-      <img src="{{ url_for('static', filename='images/cat-cascos.jpg') }}" alt="Motocross" style="aspect-ratio:1/1; object-fit:cover; border-radius:12px;">
-      <img src="{{ url_for('static', filename='images/cat-gafas.jpg') }}" alt="Antiparras" style="aspect-ratio:1/1; object-fit:cover; border-radius:12px;">
-      <img src="{{ url_for('static', filename='images/cat-indumentaria.jpg') }}" alt="Indumentaria" style="aspect-ratio:1/1; object-fit:cover; border-radius:12px;">
-      <img src="{{ url_for('static', filename='images/header-bg.jpg') }}" alt="Track Day" style="aspect-ratio:1/1; object-fit:cover; border-radius:12px;">
-    </div>
+    <div id="homeCatalogPagination" style="margin-top:26px; padding-top:18px; border-top:1px solid #e5e7eb; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; font-size:13px; color:#6b7280;"></div>
   </div>
 </section>
 
@@ -122,42 +141,179 @@
 
 {% block scripts %}
 <script>
-  // Filtrado por marca y ordenamiento instantáneo en la Home (JS puro)
+  // Filtrado por categoría -> despliegue de marcas, ordenamiento y paginación (8 ítems por página)
   (function () {
     const grid = document.getElementById("homeCatalogGrid");
-    const pills = document.querySelectorAll("#homeBrandPills .pill-btn");
+    const pagWrap = document.getElementById("homeCatalogPagination");
+    const catPills = document.querySelectorAll("#homeCategoryPills .pill-btn");
+    const brandDrawer = document.getElementById("homeBrandDrawer");
+    const brandDrawerTitle = document.getElementById("homeBrandDrawerTitle");
+    const brandPillsWrap = document.getElementById("homeBrandPills");
     const sortSelect = document.getElementById("homeSortSelect");
     if (!grid) return;
 
+    const PAGE_SIZE = 8;
+    const CAT_LABELS = {
+      cascos: "Cascos",
+      indumentaria: "Indumentaria",
+      antiparras: "Gafas / Antiparras",
+      outlet: "Outlet",
+    };
     const allCards = Array.from(grid.children);
-    let currentBrand = "Todas";
+    allCards.forEach((card, idx) => {
+      card.dataset.defaultOrder = String(idx);
+    });
 
-    function applyFilterAndSort() {
-      const sortVal = sortSelect.value;
-      const visible = allCards.filter((card) => {
-        const match = currentBrand === "Todas" || card.dataset.brand === currentBrand;
-        card.style.display = match ? "" : "none";
-        return match;
+    let currentCat = "todas";
+    let currentBrand = "Todas";
+    let currentPage = 1;
+
+    function matchesCategory(card, cat) {
+      if (cat === "todas") return true;
+      if (cat === "outlet") return card.dataset.outlet === "true";
+      return card.dataset.category === cat;
+    }
+
+    function renderBrandDrawer() {
+      if (!brandDrawer || !brandPillsWrap) return;
+      if (currentCat === "todas") {
+        brandDrawer.style.display = "none";
+        return;
+      }
+      const catCards = allCards.filter((c) => matchesCategory(c, currentCat));
+      const brands = Array.from(new Set(catCards.map((c) => c.dataset.brand).filter(Boolean))).sort();
+
+      if (brandDrawerTitle) brandDrawerTitle.textContent = CAT_LABELS[currentCat] || currentCat;
+      brandPillsWrap.innerHTML =
+        `<button type="button" class="pill-btn ${currentBrand === "Todas" ? "active" : ""}" data-brand="Todas">Todas las marcas</button>` +
+        brands
+          .map(
+            (b) =>
+              `<button type="button" class="pill-btn ${currentBrand === b ? "active" : ""}" data-brand="${b.replace(/"/g, "&quot;")}">${b}</button>`
+          )
+          .join("");
+
+      brandPillsWrap.querySelectorAll(".pill-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          currentBrand = btn.dataset.brand;
+          currentPage = 1;
+          renderBrandDrawer();
+          renderCatalog(false);
+        });
+      });
+
+      brandDrawer.style.display = "block";
+    }
+
+    function renderCatalog(scrollToTop = false) {
+      const sortVal = sortSelect ? sortSelect.value : "featured";
+      const matching = allCards.filter((card) => {
+        if (!matchesCategory(card, currentCat)) return false;
+        if (currentBrand !== "Todas" && card.dataset.brand !== currentBrand) return false;
+        return true;
       });
 
       if (sortVal === "price-asc") {
-        visible.sort((a, b) => Number(a.dataset.price) - Number(b.dataset.price));
+        matching.sort((a, b) => Number(a.dataset.price) - Number(b.dataset.price));
       } else if (sortVal === "price-desc") {
-        visible.sort((a, b) => Number(b.dataset.price) - Number(a.dataset.price));
+        matching.sort((a, b) => Number(b.dataset.price) - Number(a.dataset.price));
+      } else {
+        matching.sort((a, b) => Number(a.dataset.defaultOrder) - Number(b.dataset.defaultOrder));
       }
-      visible.forEach((el) => grid.appendChild(el));
+
+      const totalPages = Math.max(1, Math.ceil(matching.length / PAGE_SIZE));
+      if (currentPage > totalPages) currentPage = totalPages;
+      if (currentPage < 1) currentPage = 1;
+
+      const start = (currentPage - 1) * PAGE_SIZE;
+      const pageCards = new Set(matching.slice(start, start + PAGE_SIZE));
+
+      // Reordenar DOM y mostrar solo los 8 de la página actual
+      allCards.forEach((card) => {
+        card.style.display = "none";
+      });
+      matching.forEach((card) => {
+        grid.appendChild(card);
+        if (pageCards.has(card)) {
+          card.style.display = "";
+        }
+      });
+
+      if (pagWrap) {
+        if (matching.length === 0) {
+          pagWrap.innerHTML = `<span>No hay productos en esta selección.</span>`;
+        } else {
+          const from = start + 1;
+          const to = Math.min(start + PAGE_SIZE, matching.length);
+          let numsHtml = "";
+          for (let i = 1; i <= totalPages; i++) {
+            numsHtml += `<button type="button" class="pill-btn ${i === currentPage ? "active" : ""}" data-page="${i}" style="min-width:34px; height:34px; padding:0 11px; font-size:12.5px;">${i}</button>`;
+          }
+          pagWrap.innerHTML = `
+            <span>Mostrando <strong>${from}–${to}</strong> de <strong>${matching.length}</strong> productos</span>
+            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+              <button type="button" class="btn btn-outline" data-page="${currentPage - 1}" style="height:34px; padding:0 12px; font-size:12.5px;" ${currentPage <= 1 ? "disabled" : ""}>← Anterior</button>
+              ${numsHtml}
+              <button type="button" class="btn btn-outline" data-page="${currentPage + 1}" style="height:34px; padding:0 12px; font-size:12.5px;" ${currentPage >= totalPages ? "disabled" : ""}>Siguiente →</button>
+            </div>
+          `;
+          pagWrap.querySelectorAll("button[data-page]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              const target = Number(btn.dataset.page);
+              if (!target || target === currentPage || target < 1 || target > totalPages) return;
+              currentPage = target;
+              renderCatalog(true);
+            });
+          });
+        }
+      }
+
+      if (scrollToTop) {
+        document.getElementById("catalogo")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
     }
 
-    pills.forEach((btn) => {
+    catPills.forEach((btn) => {
       btn.addEventListener("click", () => {
-        pills.forEach((b) => b.classList.remove("active"));
+        catPills.forEach((b) => b.classList.remove("active"));
         btn.classList.add("active");
-        currentBrand = btn.dataset.brand;
-        applyFilterAndSort();
+        currentCat = btn.dataset.cat;
+        currentBrand = "Todas";
+        currentPage = 1;
+        renderBrandDrawer();
+        renderCatalog(false);
       });
     });
 
-    sortSelect?.addEventListener("change", applyFilterAndSort);
+    sortSelect?.addEventListener("change", () => {
+      currentPage = 1;
+      renderCatalog(false);
+    });
+
+    renderCatalog(false);
+  })();
+
+  // Rotación automática de los 3 textos del Hero Banner
+  (function () {
+    const slides = document.querySelectorAll("#heroSlides .hero-slide");
+    const dots = document.querySelectorAll("#heroDots .hero-dot");
+    if (slides.length < 2) return;
+    let idx = 0;
+
+    function goTo(next) {
+      idx = (next + slides.length) % slides.length;
+      slides.forEach((s, i) => s.classList.toggle("active", i === idx));
+      dots.forEach((d, i) => d.classList.toggle("active", i === idx));
+    }
+
+    let timer = setInterval(() => goTo(idx + 1), 4500);
+    dots.forEach((dot) => {
+      dot.addEventListener("click", () => {
+        clearInterval(timer);
+        goTo(Number(dot.dataset.slide) || 0);
+        timer = setInterval(() => goTo(idx + 1), 4500);
+      });
+    });
   })();
 </script>
 {% endblock %}

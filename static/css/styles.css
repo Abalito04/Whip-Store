@@ -333,18 +333,59 @@ button, input, select {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  opacity: 0.42;
+  opacity: 0.64;
 }
 .hero-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, #111111 0%, rgba(17, 17, 17, 0.8) 55%, rgba(17, 17, 17, 0.15) 100%);
+  background: linear-gradient(90deg, rgba(17, 17, 17, 0.88) 0%, rgba(17, 17, 17, 0.62) 55%, rgba(17, 17, 17, 0.22) 100%);
 }
 .hero-content {
   position: relative;
   z-index: 2;
   padding: 64px 0 76px;
   max-width: 580px;
+}
+.hero-slides {
+  position: relative;
+  min-height: 215px;
+}
+.hero-slide {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+  transition: opacity 0.55s ease, transform 0.55s ease;
+}
+.hero-slide.active {
+  position: relative;
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.hero-slide h1, .hero-slide p {
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+}
+.hero-dots {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+}
+.hero-dot {
+  width: 24px;
+  height: 4px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.32);
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.25s, width 0.25s;
+}
+.hero-dot.active {
+  width: 38px;
+  background: #ffffff;
 }
 .hero-pill {
   display: inline-flex;
@@ -1252,6 +1293,29 @@ button, input, select {
   flex-shrink: 0;
 }
 .mobile-dropdown { position: relative; top: 8px; }
+
+.cat-filters-bar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 14px 0;
+  border-bottom: 1px solid #f3f4f6;
+  margin-bottom: 20px;
+  max-width: 560px;
+}
+.cat-filters-bar select {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #111111;
+  font-size: 12.5px !important;
+  font-weight: 700;
+  text-overflow: ellipsis;
+}
 
 /* ---------------- RESPONSIVE (MOBILE-FIRST POLISH) ---------------- */
 @media (max-width: 1024px) {

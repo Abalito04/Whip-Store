@@ -122,6 +122,14 @@ def ensure_schema_updates():
             db.session.execute(text("ALTER TABLE products ADD COLUMN cash_price INTEGER"))
         if "is_outlet" not in prod_cols:
             db.session.execute(text("ALTER TABLE products ADD COLUMN is_outlet BOOLEAN DEFAULT FALSE"))
+    if "categories" in tables:
+        db.session.execute(text("UPDATE categories SET name = 'Gafas / Antiparras' WHERE slug = 'antiparras'"))
+        db.session.execute(
+            text(
+                "UPDATE categories SET image_url = '/static/images/banner2.png' "
+                "WHERE slug IN ('cascos', 'indumentaria', 'antiparras')"
+            )
+        )
     db.session.commit()
 
 
@@ -173,11 +181,22 @@ def inject_globals():
 
 @app.route("/")
 def home():
-    active_products = (
-        Product.query.filter_by(is_active=True).order_by(Product.is_featured.desc(), Product.id.asc()).all()
+    cat_order = {"cascos": 0, "indumentaria": 1, "antiparras": 2, "accesorios": 3}
+    active_products = Product.query.filter_by(is_active=True).all()
+    active_products.sort(
+        key=lambda p: (
+            1 if p.is_outlet else 0,  # Nuevos primero, Outlet después
+            cat_order.get(p.category.slug if p.category else "", 9),  # Cascos -> Indumentaria -> Gafas/Antiparras
+            0 if p.is_featured else 1,
+            p.id,
+        )
     )
     featured_products = [p for p in active_products if p.is_featured][:8]
-    categories = Category.query.limit(3).all()
+    all_cats = Category.query.all()
+    categories = sorted(
+        [c for c in all_cats if c.slug in ("cascos", "indumentaria", "antiparras")],
+        key=lambda c: cat_order.get(c.slug, 9),
+    )
     brands = sorted(list({p.brand for p in active_products}))
     return render_template(
         "index.html",
@@ -191,12 +210,11 @@ def home():
 @app.route("/categoria/<slug>")
 def categoria(slug):
     meta_map = {
-        "cascos": ("Cascos Off-Road & DH", "Stock real por talle · 6 cuotas sin interés y 15% OFF por transferencia."),
-        "antiparras": ("Antiparras", "Visión cristalina en barro y polvo con lentes de alta definición."),
-        "indumentaria": ("Indumentaria", "Jerseys, pantalones y equipamiento técnico para pista y enduro."),
-        "accesorios": ("Accesorios", "Complementos esenciales para el cuidado de tu equipamiento."),
-        "outlet": ("Outlet · Usados Seleccionados", "Cascos y equipamiento usado verificado por Whip Store al mejor precio."),
-        "ofertas": ("Sale / Ofertas", "Productos seleccionados con descuento especial y envíos por Correo Argentino."),
+        "cascos": ("Cascos", ""),
+        "antiparras": ("Gafas / Antiparras", ""),
+        "indumentaria": ("Indumentaria", ""),
+        "accesorios": ("Accesorios", ""),
+        "outlet": ("Outlet", ""),
     }
     title, subtitle = meta_map.get(slug, ("Catálogo", "Todos los productos disponibles en Whip Store."))
 
@@ -237,6 +255,8 @@ def categoria(slug):
         filtered.sort(key=lambda p: p.price)
     elif sort_by == "price-desc":
         filtered.sort(key=lambda p: p.price, reverse=True)
+    else:
+        filtered.sort(key=lambda p: (1 if p.is_outlet else 0, 0 if p.is_featured else 1, p.id))
 
     return render_template(
         "categoria.html",
@@ -275,6 +295,11 @@ def producto(slug):
 @app.route("/checkout")
 def checkout():
     return render_template("checkout.html")
+
+
+@app.route("/legales")
+def legales():
+    return render_template("legales.html")
 
 
 @app.route("/admin")
