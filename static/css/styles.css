@@ -1601,7 +1601,14 @@ button, input, select {
   .cat-banners::-webkit-scrollbar { display: none; }
   .cat-banner { flex: 0 0 76%; height: 148px; padding: 14px; border-radius: 12px; scroll-snap-align: start; }
   .section { padding: 28px 0; }
-  .section-title { font-size: 20px; }
+  .section-head { align-items: center; gap: 10px; }
+  .section-title { font-size: 19px; }
+  #homeSortSelect {
+    font-size: 12px !important;
+    height: 34px !important;
+    padding: 0 8px !important;
+    max-width: 158px;
+  }
   .product-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .product-card { border-radius: 10px; }
   .card-media { padding: 10px; }

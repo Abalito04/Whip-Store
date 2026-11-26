@@ -3,7 +3,7 @@
   const TRANSFER_DISCOUNT_PCT = 15;
 
   const ANNOUNCEMENTS = [
-    "🚚 Envíos a todo el país por Correo Argentino desde Santa Rosa, La Pampa",
+    "🚚 Envíos a todo el país por Correo Argentino",
     "💳 Hasta 6 CUOTAS SIN INTERÉS con todas las tarjetas",
     "💸 Descuento especial abonando por Transferencia o Efectivo",
   ];
