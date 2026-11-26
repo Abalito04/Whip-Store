@@ -213,7 +213,7 @@ def inject_globals():
 @app.route("/")
 def home():
     cat_order = {"cascos": 0, "indumentaria": 1, "antiparras": 2, "accesorios": 3}
-    active_products = Product.query.filter_by(is_active=True).all()
+    active_products = [p for p in Product.query.filter_by(is_active=True).all() if p.total_stock > 0]
     active_products.sort(
         key=lambda p: (
             1 if p.is_outlet else 0,  # Nuevos primero, Outlet después
@@ -270,7 +270,7 @@ def categoria(slug):
         else:
             query = query.filter(False)
 
-    base_products = query.all()
+    base_products = [p for p in query.all() if p.total_stock > 0]
     brands = sorted(list({p.brand for p in base_products}))
     sizes = sorted(
         list({v.size for p in base_products for v in p.variants if v.stock > 0}),
@@ -315,15 +315,15 @@ def categoria(slug):
 @app.route("/producto/<slug>")
 def producto(slug):
     product = Product.query.filter_by(slug=slug).first_or_404()
-    related = (
-        Product.query.filter(
+    related = [
+        p
+        for p in Product.query.filter(
             Product.is_active.is_(True),
             Product.id != product.id,
             Product.category_id == product.category_id,
-        )
-        .limit(4)
-        .all()
-    )
+        ).all()
+        if p.total_stock > 0
+    ][:4]
     return render_template(
         "producto.html",
         product=product,
@@ -362,7 +362,7 @@ def api_search():
     q = (request.args.get("q") or "").strip().lower()
     if not q:
         return jsonify([])
-    products = Product.query.filter_by(is_active=True).all()
+    products = [p for p in Product.query.filter_by(is_active=True).all() if p.total_stock > 0]
     matches = [
         p.to_dict()
         for p in products
@@ -373,7 +373,7 @@ def api_search():
 
 @app.route("/api/products")
 def api_products():
-    products = Product.query.filter_by(is_active=True).all()
+    products = [p for p in Product.query.filter_by(is_active=True).all() if p.total_stock > 0]
     return jsonify([p.to_dict() for p in products])
 
 
