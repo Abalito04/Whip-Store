@@ -20,6 +20,9 @@
     selectedSubcat: "",
     selectedBrand: "TODAS",
     salesFilter: "ALL",
+    stockCategory: "todas",
+    stockSubcat: "",
+    stockBrand: "TODAS",
     stockPage: 1,
     stockPageSize: 10,
     channel: "LOCAL",
@@ -857,7 +860,53 @@
   });
 
   // ---------------- STOCK & PRODUCTS (UNIFICADO) ----------------
+  function matchesStockCategory(p, cat) {
+    if (cat === "todas") return true;
+    if (cat === "outlet") return Boolean(p.is_outlet);
+    if (p.category_slug !== cat) return false;
+    if (cat === "indumentaria" && state.stockSubcat) {
+      return (p.subcategory || "") === state.stockSubcat;
+    }
+    return true;
+  }
+
+  function renderStockFilters() {
+    const allProds = state.products || [];
+    const setCnt = (id, n) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = `${n} prod.`;
+    };
+    setCnt("stockCatCountTodas", allProds.length);
+    setCnt("stockCatCountCascos", allProds.filter((p) => p.category_slug === "cascos").length);
+    setCnt("stockCatCountIndumentaria", allProds.filter((p) => p.category_slug === "indumentaria").length);
+    setCnt("stockCatCountAntiparras", allProds.filter((p) => p.category_slug === "antiparras").length);
+    setCnt("stockCatCountOutlet", allProds.filter((p) => p.is_outlet).length);
+
+    const drawer = document.getElementById("stockBrandDrawer");
+    const subWrap = document.getElementById("stockSubcatWrap");
+    const wrap = document.getElementById("stockBrandPills");
+    if (!drawer || !wrap) return;
+
+    if (state.stockCategory === "todas") {
+      drawer.style.display = "none";
+      return;
+    }
+    if (subWrap) {
+      subWrap.style.display = state.stockCategory === "indumentaria" ? "block" : "none";
+    }
+    const catProds = allProds.filter((p) => matchesStockCategory(p, state.stockCategory));
+    const brands = ["TODAS", ...Array.from(new Set(catProds.map((p) => p.brand))).sort()];
+    wrap.innerHTML = brands
+      .map(
+        (b) =>
+          `<button type="button" class="pill-btn ${state.stockBrand === b ? "active" : ""}" onclick="window.WhipPOS.setStockBrand('${b.replace(/'/g, "\\'")}')">${b === "TODAS" ? "Todas las marcas" : esc(b)}</button>`
+      )
+      .join("");
+    drawer.style.display = "block";
+  }
+
   function renderStockTab() {
+    renderStockFilters();
     const badgeLow = document.getElementById("posBadgeLowStock");
     if (badgeLow) badgeLow.textContent = state.lowStock.length ? `(${state.lowStock.length})` : "";
 
@@ -892,6 +941,8 @@
     if (!tbody) return;
     const q = (document.getElementById("posStockSearch")?.value || "").trim().toLowerCase();
     const list = state.products.filter((p) => {
+      if (!matchesStockCategory(p, state.stockCategory)) return false;
+      if (state.stockBrand !== "TODAS" && p.brand !== state.stockBrand) return false;
       if (!q) return true;
       return (
         p.name.toLowerCase().includes(q) ||
@@ -1684,6 +1735,29 @@
     },
     shareReceiptImage,
     renderStockTab,
+    setStockCategory(cat, btn) {
+      state.stockCategory = cat;
+      state.stockSubcat = "";
+      state.stockBrand = "TODAS";
+      state.stockPage = 1;
+      document.querySelectorAll("#stockCategoryCards .pos-cat-card").forEach((b) => b.classList.remove("active"));
+      if (btn) btn.classList.add("active");
+      document.querySelectorAll("#stockSubcatPills .pill-btn").forEach((b) => b.classList.toggle("active", b.dataset.sub === ""));
+      renderStockTab();
+    },
+    setStockSubcat(sub, btn) {
+      state.stockSubcat = sub;
+      state.stockBrand = "TODAS";
+      state.stockPage = 1;
+      document.querySelectorAll("#stockSubcatPills .pill-btn").forEach((b) => b.classList.remove("active"));
+      if (btn) btn.classList.add("active");
+      renderStockTab();
+    },
+    setStockBrand(b) {
+      state.stockBrand = b;
+      state.stockPage = 1;
+      renderStockTab();
+    },
     onStockSearch() {
       state.stockPage = 1;
       renderStockTab();

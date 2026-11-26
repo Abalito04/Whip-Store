@@ -208,7 +208,7 @@
 
     <!-- TAB 2: STOCK Y PRODUCTOS (GESTIÓN COMPLETA WEB + LOCAL) -->
     <section id="pos-tab-stock" class="pos-tab-panel" style="display:none;">
-      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
         <input
           type="text"
           id="posStockSearch"
@@ -224,6 +224,42 @@
           </label>
           <button type="button" class="btn btn-cta" style="height:40px; font-size:13px;" onclick="document.getElementById('posNewProductModal').classList.add('open')">+ Nuevo Producto</button>
         </div>
+      </div>
+
+      <div class="pos-cat-grid" id="stockCategoryCards" style="margin-bottom:12px;">
+        <button type="button" class="pos-cat-card active" data-cat="todas" onclick="window.WhipPOS.setStockCategory('todas', this)">
+          <strong>Todos</strong>
+          <span id="stockCatCountTodas">0</span>
+        </button>
+        <button type="button" class="pos-cat-card" data-cat="cascos" onclick="window.WhipPOS.setStockCategory('cascos', this)">
+          <strong>🏍️ Cascos</strong>
+          <span id="stockCatCountCascos">0</span>
+        </button>
+        <button type="button" class="pos-cat-card" data-cat="indumentaria" onclick="window.WhipPOS.setStockCategory('indumentaria', this)">
+          <strong>👕 Indumentaria</strong>
+          <span id="stockCatCountIndumentaria">0</span>
+        </button>
+        <button type="button" class="pos-cat-card" data-cat="antiparras" onclick="window.WhipPOS.setStockCategory('antiparras', this)">
+          <strong>🥽 Gafas / Antip.</strong>
+          <span id="stockCatCountAntiparras">0</span>
+        </button>
+        <button type="button" class="pos-cat-card outlet" data-cat="outlet" onclick="window.WhipPOS.setStockCategory('outlet', this)">
+          <strong>🏷️ Outlet</strong>
+          <span id="stockCatCountOutlet">0</span>
+        </button>
+      </div>
+
+      <div id="stockBrandDrawer" style="display:none; margin-bottom:14px; padding:10px 12px; background:#ffffff; border:1px solid #e5e7eb; border-radius:10px;">
+        <div id="stockSubcatWrap" style="display:none; margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #e5e7eb;">
+          <div style="font-size:10.5px; font-weight:800; color:#6b7280; text-transform:uppercase; margin-bottom:5px;">Subcategoría</div>
+          <div class="pos-brand-pills" id="stockSubcatPills" style="margin-bottom:0;">
+            <button type="button" class="pill-btn active" data-sub="" onclick="window.WhipPOS.setStockSubcat('', this)">Todas</button>
+            <button type="button" class="pill-btn" data-sub="casual" onclick="window.WhipPOS.setStockSubcat('casual', this)">Casual / Informal</button>
+            <button type="button" class="pill-btn" data-sub="competicion" onclick="window.WhipPOS.setStockSubcat('competicion', this)">Competición</button>
+          </div>
+        </div>
+        <div style="font-size:10.5px; font-weight:800; color:#6b7280; text-transform:uppercase; margin-bottom:6px;">Marcas</div>
+        <div class="pos-brand-pills" id="stockBrandPills" style="margin-bottom:0;"></div>
       </div>
 
       <div class="card-panel" style="padding:0; overflow:hidden; margin-bottom:18px;">
@@ -661,6 +697,6 @@
   <div id="posToast" class="pos-toast"></div>
 {% endif %}
 
-<script src="{{ url_for('static', filename='js/pos.js') }}?v=22"></script>
+<script src="{{ url_for('static', filename='js/pos.js') }}?v=23"></script>
 </body>
 </html>
