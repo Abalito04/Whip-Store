@@ -179,7 +179,7 @@
             <div class="form-grid" style="gap:8px;">
               <div class="field">
                 <label style="font-size:11px;">Descuento extra ($)</label>
-                <input type="number" id="posManualDiscount" value="0" min="0" oninput="window.WhipPOS.renderCart()" style="height:36px; font-size:13px;">
+                <input type="text" inputmode="decimal" class="ars-price-input" id="posManualDiscount" value="0" oninput="window.WhipPOS.renderCart()" style="height:36px; font-size:13px;">
               </div>
               <div class="field">
                 <label style="font-size:11px;">Cliente (opcional)</label>
@@ -302,7 +302,7 @@
         <form id="openCashForm" style="display:flex; flex-direction:column; gap:12px;">
           <div class="field">
             <label>Efectivo inicial en caja (ARS)</label>
-            <input type="number" id="cashOpeningAmount" value="0" min="0" required>
+            <input type="text" inputmode="decimal" class="ars-price-input" id="cashOpeningAmount" value="0" required>
           </div>
           <div class="field">
             <label>Observaciones (opcional)</label>
@@ -355,7 +355,7 @@
             </div>
             <div class="field">
               <label>Monto (ARS)</label>
-              <input type="number" id="cmAmount" min="1" required placeholder="5000">
+              <input type="text" inputmode="decimal" class="ars-price-input" id="cmAmount" required placeholder="5.000">
             </div>
             <div class="field">
               <label>Descripción</label>
@@ -465,9 +465,9 @@
           </select>
         </div>
         <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px;">
-          <div class="field"><label>Precio Lista / Tarjetas *</label><input type="number" id="pnpPrice" value="350000" min="0" required></div>
-          <div class="field"><label>Precio Efectivo / Transf.</label><input type="number" id="pnpCashPrice" min="0" placeholder="Auto -15% si vacío"></div>
-          <div class="field"><label>Precio tachado (oferta)</label><input type="number" id="pnpComparePrice" min="0" placeholder="Sin oferta"></div>
+          <div class="field"><label>Precio Lista / Tarjetas *</label><input type="text" inputmode="decimal" class="ars-price-input" id="pnpPrice" value="350.000" required></div>
+          <div class="field"><label>Precio Efectivo / Transf.</label><input type="text" inputmode="decimal" class="ars-price-input" id="pnpCashPrice" placeholder="Auto -15% si vacío"></div>
+          <div class="field"><label>Precio tachado (oferta)</label><input type="text" inputmode="decimal" class="ars-price-input" id="pnpComparePrice" placeholder="Sin oferta"></div>
         </div>
         <div class="form-grid" style="align-items:center;">
           <div class="field"><label>Color</label><input type="text" id="pnpColor" value="Negro Mate"></div>
@@ -544,9 +544,9 @@
           </select>
         </div>
         <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px;">
-          <div class="field"><label>Precio Lista / Tarjetas *</label><input type="number" id="epPrice" min="0" required></div>
-          <div class="field"><label>Precio Efectivo / Transf.</label><input type="number" id="epCashPrice" min="0" placeholder="Auto -15% si vacío"></div>
-          <div class="field"><label>Precio tachado (oferta)</label><input type="number" id="epComparePrice" min="0" placeholder="Sin oferta"></div>
+          <div class="field"><label>Precio Lista / Tarjetas *</label><input type="text" inputmode="decimal" class="ars-price-input" id="epPrice" required></div>
+          <div class="field"><label>Precio Efectivo / Transf.</label><input type="text" inputmode="decimal" class="ars-price-input" id="epCashPrice" placeholder="Auto -15% si vacío"></div>
+          <div class="field"><label>Precio tachado (oferta)</label><input type="text" inputmode="decimal" class="ars-price-input" id="epComparePrice" placeholder="Sin oferta"></div>
         </div>
         <div style="display:flex; gap:18px; flex-wrap:wrap; font-size:13px;">
           <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
@@ -678,7 +678,7 @@
         </div>
         <div class="field">
           <label>Efectivo real contado (ARS) *</label>
-          <input type="number" id="closeCountedAmount" min="0" required oninput="window.WhipPOS.updateCloseDiff()">
+          <input type="text" inputmode="decimal" class="ars-price-input" id="closeCountedAmount" required oninput="window.WhipPOS.updateCloseDiff()">
         </div>
         <div id="closeDiffLabel" style="font-size:13px; font-weight:700;"></div>
         <div class="field">
@@ -697,6 +697,6 @@
   <div id="posToast" class="pos-toast"></div>
 {% endif %}
 
-<script src="{{ url_for('static', filename='js/pos.js') }}?v=23"></script>
+<script src="{{ url_for('static', filename='js/pos.js') }}?v=25"></script>
 </body>
 </html>

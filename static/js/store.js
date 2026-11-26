@@ -9,8 +9,14 @@
   ];
 
   function formatARS(amount) {
-    const num = Math.round(Number(amount) || 0);
-    return "$ " + num.toLocaleString("es-AR");
+    const val = Number(amount) || 0;
+    const neg = val < 0 ? "-" : "";
+    const totalCents = Math.round(Math.abs(val) * 100);
+    const cents = totalCents % 100;
+    const intPart = Math.floor(totalCents / 100)
+      .toString()
+      .replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    return cents > 0 ? `${neg}$ ${intPart},${String(cents).padStart(2, "0")}` : `${neg}$ ${intPart}`;
   }
 
   function getCart() {

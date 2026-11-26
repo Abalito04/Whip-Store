@@ -194,8 +194,15 @@ with app.app_context():
 @app.template_filter("ars")
 def format_ars(value):
     try:
-        num = int(round(float(value)))
-        return "$ " + f"{num:,}".replace(",", ".")
+        val = float(value)
+        neg = "-" if val < 0 else ""
+        total_cents = int(round(abs(val) * 100))
+        cents = total_cents % 100
+        int_part = total_cents // 100
+        int_fmt = f"{int_part:,}".replace(",", ".")
+        if cents > 0:
+            return f"{neg}$ {int_fmt},{cents:02d}"
+        return f"{neg}$ {int_fmt}"
     except Exception:
         return "$ 0"
 

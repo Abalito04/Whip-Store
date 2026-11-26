@@ -1,5 +1,68 @@
 (function () {
-  const fmt = (n) => "$ " + Math.round(Number(n) || 0).toLocaleString("es-AR");
+  function fmt(n) {
+    const val = Number(n) || 0;
+    const neg = val < 0 ? "-" : "";
+    const totalCents = Math.round(Math.abs(val) * 100);
+    const cents = totalCents % 100;
+    const intPart = Math.floor(totalCents / 100)
+      .toString()
+      .replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    return cents > 0 ? `${neg}$ ${intPart},${String(cents).padStart(2, "0")}` : `${neg}$ ${intPart}`;
+  }
+
+  function fmtInputARS(val, allowZero = false) {
+    if (val === null || val === undefined || val === "") return "";
+    if (typeof val === "number") {
+      if (!Number.isFinite(val) || (val < 0) || (!allowZero && val === 0)) return "";
+      if (val === 0) return "0";
+      const hasCents = Math.round(val * 100) % 100 !== 0;
+      const fixed = hasCents ? val.toFixed(2) : String(Math.round(val));
+      const [iPart, dPart] = fixed.split(".");
+      const iFmt = iPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+      return dPart ? `${iFmt},${dPart}` : iFmt;
+    }
+    const cleaned = String(val).replace(/[^\d,]/g, "");
+    if (!cleaned) return "";
+    const parts = cleaned.split(",");
+    const intRaw = parts[0].replace(/^0+(?=\d)/, "");
+    const intFmt = intRaw.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    if (parts.length > 1) {
+      const dec = parts.slice(1).join("").slice(0, 2);
+      return `${intFmt || "0"},${dec}`;
+    }
+    return intFmt;
+  }
+
+  function parseInputARS(str) {
+    const cleaned = String(str ?? "").trim().replace(/\./g, "").replace(",", ".");
+    const num = parseFloat(cleaned);
+    return Number.isFinite(num) && num > 0 ? Math.round(num) : 0;
+  }
+
+  document.addEventListener("input", (e) => {
+    const el = e.target;
+    if (!el || !el.classList || !el.classList.contains("ars-price-input")) return;
+    const oldVal = el.value;
+    const caret = el.selectionStart ?? oldVal.length;
+    const sigBefore = oldVal.slice(0, caret).replace(/[^\d,]/g, "").length;
+    const formatted = fmtInputARS(oldVal);
+    if (formatted === oldVal) return;
+    el.value = formatted;
+    let seen = 0;
+    let newCaret = formatted.length;
+    for (let i = 0; i < formatted.length; i++) {
+      if (/[\d,]/.test(formatted[i])) seen++;
+      if (seen >= sigBefore) {
+        newCaret = sigBefore === 0 ? 0 : i + 1;
+        break;
+      }
+    }
+    try {
+      el.setSelectionRange(newCaret, newCaret);
+    } catch {
+      // ignore
+    }
+  });
   const esc = (s) =>
     String(s ?? "")
       .replace(/&/g, "&amp;")
@@ -338,7 +401,7 @@
 
     const subtotal = state.cart.reduce((acc, i) => acc + i.price * i.quantity, 0);
     const applyCashPrice = Boolean(document.getElementById("posApplyTransferDiscount")?.checked);
-    const manualDesc = Math.max(0, parseInt(document.getElementById("posManualDiscount")?.value || "0", 10) || 0);
+    const manualDesc = Math.max(0, parseInputARS(document.getElementById("posManualDiscount")?.value));
     const autoCashDisc = applyCashPrice
       ? state.cart.reduce((acc, i) => acc + Math.max(0, i.price - (i.transfer_price ?? i.price)) * i.quantity, 0)
       : 0;
@@ -384,7 +447,7 @@
         payment_ref: payRef,
         notes: payRef ? `Comp: ${payRef}` : "",
         apply_transfer_discount: Boolean(document.getElementById("posApplyTransferDiscount")?.checked),
-        discount_amount: parseInt(document.getElementById("posManualDiscount")?.value || "0", 10) || 0,
+        discount_amount: parseInputARS(document.getElementById("posManualDiscount")?.value),
         customer_name: document.getElementById("posCustomerName")?.value.trim() || "Cliente Mostrador",
         customer_phone: document.getElementById("posCustomerPhone")?.value.trim() || "-",
       };
@@ -680,7 +743,7 @@
 
   document.getElementById("openCashForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const opening_amount = parseInt(document.getElementById("cashOpeningAmount").value || "0", 10) || 0;
+    const opening_amount = parseInputARS(document.getElementById("cashOpeningAmount").value);
     const notes = document.getElementById("cashOpeningNotes").value.trim();
     const res = await fetch("/api/pos/cash/open", {
       method: "POST",
@@ -699,7 +762,7 @@
   document.getElementById("cashMovementForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const movement_type = document.getElementById("cmType").value;
-    const amount = parseInt(document.getElementById("cmAmount").value || "0", 10) || 0;
+    const amount = parseInputARS(document.getElementById("cmAmount").value);
     const description = document.getElementById("cmDesc").value.trim();
     const res = await fetch("/api/pos/cash/movement", {
       method: "POST",
@@ -720,7 +783,7 @@
   function openCloseCashModal() {
     if (!state.activeSession) return;
     document.getElementById("closeExpectedLabel").textContent = fmt(state.activeSession.expected_cash);
-    document.getElementById("closeCountedAmount").value = state.activeSession.expected_cash;
+    document.getElementById("closeCountedAmount").value = fmtInputARS(state.activeSession.expected_cash, true);
     document.getElementById("closeNotes").value = "";
     updateCloseDiff();
     document.getElementById("closeCashModal").classList.add("open");
@@ -728,7 +791,7 @@
 
   function updateCloseDiff() {
     if (!state.activeSession) return;
-    const counted = parseInt(document.getElementById("closeCountedAmount").value || "0", 10) || 0;
+    const counted = parseInputARS(document.getElementById("closeCountedAmount").value);
     const diff = counted - state.activeSession.expected_cash;
     const lbl = document.getElementById("closeDiffLabel");
     if (diff === 0) {
@@ -745,7 +808,7 @@
 
   document.getElementById("closeCashForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const closing_amount = parseInt(document.getElementById("closeCountedAmount").value || "0", 10) || 0;
+    const closing_amount = parseInputARS(document.getElementById("closeCountedAmount").value);
     const notes = document.getElementById("closeNotes").value.trim();
     const res = await fetch("/api/pos/cash/close", {
       method: "POST",
@@ -987,12 +1050,12 @@
                 <div style="display:flex; flex-direction:column; gap:5px;">
                   <div style="display:flex; align-items:center; gap:5px;">
                     <span style="font-size:10.5px; color:#6b7280; min-width:38px;">Lista:</span>
-                    <input type="number" id="price-in-${p.id}" value="${p.price}" style="width:98px; height:28px; padding:0 7px; border-radius:6px; border:1px solid #d1d5db; background:#fff; color:#111; font-weight:700; font-size:12px;">
+                    <input type="text" inputmode="decimal" class="ars-price-input" id="price-in-${p.id}" value="${fmtInputARS(p.price)}" style="width:108px; height:28px; padding:0 7px; border-radius:6px; border:1px solid #d1d5db; background:#fff; color:#111; font-weight:700; font-size:12px;">
                   </div>
                   <div style="display:flex; flex-direction:column; gap:5px;">
                     <div style="display:flex; align-items:center; gap:5px;">
                       <span style="font-size:10.5px; color:#00a650; min-width:38px; font-weight:700;">Ef/Tr:</span>
-                      <input type="number" id="cash-in-${p.id}" value="${p.cash_price || p.transfer_price}" style="width:98px; height:28px; padding:0 7px; border-radius:6px; border:1px solid #86efac; background:#f0fdf4; color:#065f46; font-weight:700; font-size:12px;">
+                      <input type="text" inputmode="decimal" class="ars-price-input" id="cash-in-${p.id}" value="${fmtInputARS(p.cash_price || p.transfer_price)}" style="width:108px; height:28px; padding:0 7px; border-radius:6px; border:1px solid #86efac; background:#f0fdf4; color:#065f46; font-weight:700; font-size:12px;">
                       <button type="button" class="btn btn-outline" style="height:28px; padding:0 8px; font-size:11px;" onclick="window.WhipPOS.savePrice(${p.id})">Guardar</button>
                     </div>
                   </div>
@@ -1057,8 +1120,8 @@
   }
 
   async function savePrice(productId) {
-    const val = parseInt(document.getElementById(`price-in-${productId}`)?.value || "0", 10);
-    const cashVal = parseInt(document.getElementById(`cash-in-${productId}`)?.value || "0", 10) || null;
+    const val = parseInputARS(document.getElementById(`price-in-${productId}`)?.value);
+    const cashVal = parseInputARS(document.getElementById(`cash-in-${productId}`)?.value) || null;
     if (val <= 0) return toast("Precio lista inválido", true);
     const res = await fetch(`/api/admin/product/${productId}`, {
       method: "PATCH",
@@ -1199,9 +1262,9 @@
     if (epSubField) epSubField.style.display = (p.category_slug === "indumentaria") ? "block" : "none";
     const epSubSel = document.getElementById("epSubcategory");
     if (epSubSel) epSubSel.value = p.subcategory || "competicion";
-    document.getElementById("epPrice").value = p.price || 0;
-    document.getElementById("epCashPrice").value = p.cash_price || p.transfer_price || "";
-    document.getElementById("epComparePrice").value = p.compare_at_price || "";
+    document.getElementById("epPrice").value = fmtInputARS(p.price || 0);
+    document.getElementById("epCashPrice").value = fmtInputARS(p.cash_price || p.transfer_price || 0);
+    document.getElementById("epComparePrice").value = p.compare_at_price ? fmtInputARS(p.compare_at_price) : "";
     document.getElementById("epIsActive").checked = Boolean(p.is_active);
     document.getElementById("epIsFeatured").checked = Boolean(p.is_featured);
     document.getElementById("epIsOutlet").checked = Boolean(p.is_outlet);
@@ -1274,9 +1337,9 @@
       brand: document.getElementById("epBrand").value.trim(),
       category_slug: document.getElementById("epCategory").value,
       subcategory: document.getElementById("epCategory").value === "indumentaria" ? (document.getElementById("epSubcategory")?.value || "competicion") : "",
-      price: parseInt(document.getElementById("epPrice").value || "0", 10) || 0,
-      cash_price: parseInt(document.getElementById("epCashPrice").value || "0", 10) || null,
-      compare_at_price: parseInt(document.getElementById("epComparePrice").value || "0", 10) || null,
+      price: parseInputARS(document.getElementById("epPrice").value),
+      cash_price: parseInputARS(document.getElementById("epCashPrice").value) || null,
+      compare_at_price: parseInputARS(document.getElementById("epComparePrice").value) || null,
       is_active: document.getElementById("epIsActive").checked,
       is_featured: document.getElementById("epIsFeatured").checked,
       is_outlet: document.getElementById("epIsOutlet").checked,
@@ -1385,9 +1448,9 @@
       brand: document.getElementById("pnpBrand").value.trim(),
       category_slug: document.getElementById("pnpCategory").value,
       subcategory: document.getElementById("pnpCategory").value === "indumentaria" ? (document.getElementById("pnpSubcategory")?.value || "competicion") : "",
-      price: parseInt(document.getElementById("pnpPrice").value || "0", 10),
-      cash_price: parseInt(document.getElementById("pnpCashPrice").value || "0", 10) || null,
-      compare_at_price: parseInt(document.getElementById("pnpComparePrice").value || "0", 10) || null,
+      price: parseInputARS(document.getElementById("pnpPrice").value),
+      cash_price: parseInputARS(document.getElementById("pnpCashPrice").value) || null,
+      compare_at_price: parseInputARS(document.getElementById("pnpComparePrice").value) || null,
       color: document.getElementById("pnpColor").value.trim(),
       description: document.getElementById("pnpDescription").value.trim(),
       images: newImages,
