@@ -28,7 +28,7 @@
     renderCartUI();
   }
 
-  function addToCart(item) {
+  function addToCart(item, openDrawer = true) {
     const cart = getCart();
     const existing = cart.find((c) => c.variant_id === item.variant_id);
     const nextQty = (existing ? existing.quantity : 0) + (item.quantity || 1);
@@ -62,7 +62,7 @@
     }
 
     saveCart(cart);
-    openCart();
+    if (openDrawer) openCart();
     return { ok: true };
   }
 
@@ -300,11 +300,36 @@
       image: btn.dataset.image,
       max_stock: Number(activeSizeBtn.dataset.stock),
       quantity: 1,
-    });
+    }, true);
 
     if (!res.ok && res.error) {
       alert(res.error);
     }
+  }
+
+  function quickBuyFromCard(btn) {
+    const card = btn.closest(".product-card");
+    const activeSizeBtn = card?.querySelector(".size-chip-btn.active");
+    if (!activeSizeBtn) return;
+
+    const res = addToCart({
+      product_id: Number(btn.dataset.productId),
+      variant_id: Number(activeSizeBtn.dataset.variantId),
+      name: btn.dataset.name,
+      slug: btn.dataset.slug,
+      size: activeSizeBtn.dataset.size,
+      color: activeSizeBtn.dataset.color,
+      price: Number(btn.dataset.price),
+      image: btn.dataset.image,
+      max_stock: Number(activeSizeBtn.dataset.stock),
+      quantity: 1,
+    }, false);
+
+    if (!res.ok && res.error) {
+      alert(res.error);
+      return;
+    }
+    window.location.href = "/checkout";
   }
 
   window.WhipStore = {
@@ -318,6 +343,7 @@
     closeCart,
     selectCardSize,
     quickAddFromCard,
+    quickBuyFromCard,
     TRANSFER_DISCOUNT_PCT,
   };
 

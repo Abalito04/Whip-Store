@@ -21,8 +21,12 @@ from seed import seed_database
 
 STORE_ORIGIN_CP = "6300"
 STORE_CITY = "Santa Rosa, La Pampa"
-STORE_WHATSAPP = "549295454401"
+STORE_WHATSAPP = os.environ.get("WSP_NUMERO", "549295454401").strip()
 STORE_INSTAGRAM = "https://www.instagram.com/whip.helmets/"
+TRANSFERENCIA_ALIAS = os.environ.get("TRANSFERENCIA_ALIAS", "WHIP.HELMETS").strip()
+TRANSFERENCIA_CBU = os.environ.get("TRANSFERENCIA_CBU", "Consultar por WhatsApp").strip()
+TRANSFERENCIA_TITULAR = os.environ.get("TRANSFERENCIA_TITULAR", "Whip Helmets Argentina").strip()
+TRANSFERENCIA_CUIL = os.environ.get("TRANSFERENCIA_CUIL", "").strip()
 TRANSFER_DISCOUNT_PCT = 15
 
 
@@ -116,6 +120,8 @@ def ensure_schema_updates():
             db.session.execute(text("ALTER TABLE orders ADD COLUMN channel VARCHAR(20) DEFAULT 'WEB'"))
         if "notes" not in existing_cols:
             db.session.execute(text("ALTER TABLE orders ADD COLUMN notes VARCHAR(255) DEFAULT ''"))
+        if "mp_payment_id" not in existing_cols:
+            db.session.execute(text("ALTER TABLE orders ADD COLUMN mp_payment_id VARCHAR(100) DEFAULT ''"))
     if "products" in tables:
         prod_cols = {c["name"] for c in inspector.get_columns("products")}
         if "cash_price" not in prod_cols:
@@ -171,8 +177,13 @@ def inject_globals():
     return {
         "TRANSFER_DISCOUNT_PCT": TRANSFER_DISCOUNT_PCT,
         "STORE_CITY": STORE_CITY,
-        "STORE_WHATSAPP": STORE_WHATSAPP,
+        "STORE_WHATSAPP": os.environ.get("WSP_NUMERO", STORE_WHATSAPP).strip(),
         "STORE_INSTAGRAM": STORE_INSTAGRAM,
+        "TRANSFERENCIA_ALIAS": os.environ.get("TRANSFERENCIA_ALIAS", TRANSFERENCIA_ALIAS).strip(),
+        "TRANSFERENCIA_CBU": os.environ.get("TRANSFERENCIA_CBU", TRANSFERENCIA_CBU).strip(),
+        "TRANSFERENCIA_TITULAR": os.environ.get("TRANSFERENCIA_TITULAR", TRANSFERENCIA_TITULAR).strip(),
+        "TRANSFERENCIA_CUIL": os.environ.get("TRANSFERENCIA_CUIL", TRANSFERENCIA_CUIL).strip(),
+        "MP_PUBLIC_KEY": os.environ.get("MP_PUBLIC_KEY", "").strip(),
     }
 
 
@@ -426,6 +437,9 @@ def api_checkout():
         last_order = Order.query.order_by(Order.order_number.desc()).first()
         next_number = (last_order.order_number + 1) if last_order else 1001
 
+        mp_access_token = os.environ.get("MP_ACCESS_TOKEN", "").strip()
+        is_mp_real = payment_method == "MERCADOPAGO" and bool(mp_access_token)
+
         new_order = Order(
             order_number=next_number,
             customer_name=data["customer_name"].strip(),
@@ -436,8 +450,8 @@ def api_checkout():
             city=data["city"].strip(),
             province=data["province"].strip(),
             payment_method=payment_method,
-            payment_status="PAID" if payment_method == "MERCADOPAGO" else "PENDING",
-            shipping_status="PREPARING" if payment_method == "MERCADOPAGO" else "UNFULFILLED",
+            payment_status="PENDING",
+            shipping_status="UNFULFILLED",
             subtotal=subtotal,
             discount_amount=discount_amount,
             shipping_cost=shipping_cost,
@@ -468,10 +482,150 @@ def api_checkout():
             )
 
         db.session.commit()
+
+        # Si hay MP_ACCESS_TOKEN configurado, crear Preferencia real de Mercado Pago Checkout Pro
+        if is_mp_real:
+            try:
+                import mercadopago
+
+                sdk = mercadopago.SDK(mp_access_token)
+                base_url = (os.environ.get("BASE_URL") or request.host_url).rstrip("/")
+                mp_items = [
+                    {
+                        "title": f"{variant.product.name} (Talle {variant.size})",
+                        "quantity": int(qty),
+                        "unit_price": float(variant.product.price),
+                        "currency_id": "ARS",
+                    }
+                    for variant, qty in order_items_to_create
+                ]
+                if shipping_cost > 0:
+                    mp_items.append(
+                        {
+                            "title": "Envío Correo Argentino",
+                            "quantity": 1,
+                            "unit_price": float(shipping_cost),
+                            "currency_id": "ARS",
+                        }
+                    )
+
+                pref_data = {
+                    "items": mp_items,
+                    "payer": {
+                        "name": new_order.customer_name,
+                        "email": new_order.customer_email,
+                    },
+                    "external_reference": str(new_order.order_number),
+                    "back_urls": {
+                        "success": f"{base_url}/pago/exitoso",
+                        "pending": f"{base_url}/pago/pendiente",
+                        "failure": f"{base_url}/pago/fallido",
+                    },
+                    "notification_url": f"{base_url}/api/webhooks/mercadopago",
+                }
+                if base_url.startswith("https://"):
+                    pref_data["auto_return"] = "approved"
+
+                pref_res = sdk.preference().create(pref_data)
+                pref = pref_res.get("response") or {}
+                init_point = pref.get("init_point") or pref.get("sandbox_init_point")
+                if init_point:
+                    return jsonify({"ok": True, "order": new_order.to_dict(), "init_point": init_point})
+                return jsonify({"ok": False, "error": f"Mercado Pago no devolvió link de pago: {pref}"}), 502
+            except Exception as mp_exc:
+                return jsonify({"ok": False, "error": f"Error al conectar con Mercado Pago: {mp_exc}"}), 502
+
         return jsonify({"ok": True, "order": new_order.to_dict()})
     except Exception as exc:
         db.session.rollback()
         return jsonify({"ok": False, "error": f"Error al procesar el pedido: {exc}"}), 500
+
+
+def _restore_order_stock_if_needed(order, reason_prefix="Pago cancelado/rechazado"):
+    if not order or order.stock_restored:
+        return
+    for item in order.items:
+        if item.variant_id:
+            variant = db.session.get(ProductVariant, item.variant_id)
+            if variant:
+                variant.stock += item.quantity
+                record_stock_movement(
+                    variant,
+                    item.quantity,
+                    "DEVOLUCION",
+                    reason=f"{reason_prefix} #{order.order_number}",
+                    order_id=order.id,
+                )
+    order.stock_restored = True
+
+
+@app.route("/pago/<status>")
+def pago_resultado(status):
+    if status not in ("exitoso", "pendiente", "fallido"):
+        status = "pendiente"
+    payment_id = (request.args.get("payment_id") or request.args.get("collection_id") or "").strip()
+    ext_ref = (request.args.get("external_reference") or "").strip()
+    order = None
+    if ext_ref.isdigit():
+        order = Order.query.filter_by(order_number=int(ext_ref)).first()
+        if order:
+            if payment_id:
+                order.mp_payment_id = payment_id
+            if status == "exitoso" and order.payment_status != "PAID":
+                order.payment_status = "PAID"
+                if order.shipping_status == "UNFULFILLED":
+                    order.shipping_status = "PREPARING"
+            elif status == "fallido" and order.payment_status != "PAID":
+                order.payment_status = "CANCELLED"
+                _restore_order_stock_if_needed(order, "Pago MP fallido Pedido")
+            db.session.commit()
+    return render_template("pago_resultado.html", status=status, order=order, payment_id=payment_id)
+
+
+@app.route("/api/webhooks/mercadopago", methods=["POST", "GET"])
+def api_webhook_mercadopago():
+    """Webhook oficial de Mercado Pago para confirmar pagos y revertir stock en rechazos."""
+    mp_access_token = os.environ.get("MP_ACCESS_TOKEN", "").strip()
+    if not mp_access_token:
+        return jsonify({"ok": True, "ignored": True}), 200
+
+    data = request.get_json(silent=True) or {}
+    payment_id = (
+        request.args.get("data.id")
+        or request.args.get("id")
+        or (data.get("data") or {}).get("id")
+        or data.get("id")
+    )
+    topic = request.args.get("type") or request.args.get("topic") or data.get("type") or data.get("topic") or ""
+
+    if not payment_id or (topic and "payment" not in str(topic)):
+        return jsonify({"ok": True}), 200
+
+    try:
+        import mercadopago
+
+        sdk = mercadopago.SDK(mp_access_token)
+        pay_res = sdk.payment().get(payment_id)
+        payment = pay_res.get("response") or {}
+        mp_status = payment.get("status")
+        ext_ref = str(payment.get("external_reference") or "").strip()
+
+        if ext_ref.isdigit():
+            order = Order.query.filter_by(order_number=int(ext_ref)).first()
+            if order:
+                order.mp_payment_id = str(payment_id)
+                if mp_status == "approved":
+                    order.payment_status = "PAID"
+                    if order.shipping_status == "UNFULFILLED":
+                        order.shipping_status = "PREPARING"
+                elif mp_status in ("rejected", "cancelled", "refunded", "charged_back"):
+                    order.payment_status = "CANCELLED"
+                    _restore_order_stock_if_needed(order, f"Webhook MP ({mp_status}) Pedido")
+                db.session.commit()
+    except Exception as exc:
+        print(f"Error procesando webhook MP: {exc}")
+
+    return jsonify({"ok": True}), 200
 
 
 # ---------------------------------------------------------------------------
@@ -488,13 +642,17 @@ def require_admin():
 @app.route("/api/admin/login", methods=["POST"])
 def api_admin_login():
     data = request.get_json(silent=True) or {}
-    email = (data.get("email") or "").strip().lower()
+    user_in = (data.get("email") or data.get("username") or "").strip().lower()
     password = (data.get("password") or "").strip()
 
-    expected_email = os.environ.get("ADMIN_EMAIL", "admin@whip-helmets.com.ar").strip().lower()
+    expected_user = (
+        os.environ.get("ADMIN_USERNAME")
+        or os.environ.get("ADMIN_EMAIL")
+        or "admin@whip-helmets.com.ar"
+    ).strip().lower()
     expected_password = os.environ.get("ADMIN_PASSWORD", "whip2026").strip()
 
-    if hmac.compare_digest(email, expected_email) and hmac.compare_digest(password, expected_password):
+    if hmac.compare_digest(user_in, expected_user) and hmac.compare_digest(password, expected_password):
         session["admin_authed"] = True
         return jsonify({"ok": True})
     return jsonify({"ok": False, "error": "Credenciales incorrectas."}), 401
@@ -578,6 +736,21 @@ def api_admin_upload_image():
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in (".png", ".jpg", ".jpeg", ".webp", ".gif"):
         return jsonify({"ok": False, "error": "Formato no permitido. Usá PNG, JPG o WEBP."}), 400
+
+    # Si Cloudinary está configurado en variables de entorno, subir allí (persistente en Railway)
+    cld_name = os.environ.get("CLOUDINARY_CLOUD_NAME", "").strip()
+    cld_key = os.environ.get("CLOUDINARY_API_KEY", "").strip()
+    cld_secret = os.environ.get("CLOUDINARY_API_SECRET", "").strip()
+    if cld_name and cld_key and cld_secret:
+        try:
+            import cloudinary
+            import cloudinary.uploader
+
+            cloudinary.config(cloud_name=cld_name, api_key=cld_key, api_secret=cld_secret, secure=True)
+            res = cloudinary.uploader.upload(file, folder="whip-store")
+            return jsonify({"ok": True, "url": res["secure_url"]})
+        except Exception as exc:
+            return jsonify({"ok": False, "error": f"Error subiendo a Cloudinary: {exc}"}), 502
 
     upload_dir = os.path.join(app.static_folder, "images", "uploads")
     os.makedirs(upload_dir, exist_ok=True)

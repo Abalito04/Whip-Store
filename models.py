@@ -129,6 +129,7 @@ class Order(db.Model):
     payment_status = db.Column(db.String(20), default="PENDING")  # PENDING | PAID | CANCELLED
     shipping_status = db.Column(db.String(20), default="UNFULFILLED")  # UNFULFILLED | PREPARING | SHIPPED | DELIVERED
     tracking_code = db.Column(db.String(80), default="")
+    mp_payment_id = db.Column(db.String(100), default="")
     channel = db.Column(db.String(20), default="WEB")  # WEB | LOCAL | WHATSAPP | INSTAGRAM
     notes = db.Column(db.String(255), default="")
 
@@ -157,6 +158,7 @@ class Order(db.Model):
             "payment_status": self.payment_status,
             "shipping_status": self.shipping_status,
             "tracking_code": self.tracking_code or "",
+            "mp_payment_id": self.mp_payment_id or "",
             "channel": self.channel or "WEB",
             "notes": self.notes or "",
             "subtotal": self.subtotal,

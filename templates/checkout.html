@@ -98,9 +98,9 @@
             <div style="flex:1;">
               <div style="display:flex; justify-content:space-between; align-items:center;">
                 <strong style="font-size:14px;">💳 Mercado Pago — Tarjetas</strong>
-                <span style="font-size:11.5px; font-weight:700; color:#4b5563;">6 cuotas sin interés</span>
+                <span style="font-size:11.5px; font-weight:700; color:#4b5563;">Hasta 6 cuotas sin interés</span>
               </div>
-              <p style="margin:4px 0 0; font-size:12px; color:#6b7280;">Simulación Sandbox: aprueba el pago al instante y descuenta stock.</p>
+              <p style="margin:4px 0 0; font-size:12px; color:#6b7280;">Te redirigimos al Checkout oficial de Mercado Pago para abonar de forma segura.</p>
             </div>
           </label>
         </div>
@@ -304,14 +304,19 @@
         return;
       }
 
-      const ord = data.order;
       window.WhipStore.clearCart();
+      if (data.init_point) {
+        window.location.href = data.init_point;
+        return;
+      }
+
+      const ord = data.order;
       document.getElementById("checkoutContainer").style.display = "none";
       const box = document.getElementById("checkoutSuccess");
       box.style.display = "block";
 
       const waText = encodeURIComponent(
-        `¡Hola Whip Store! Acabo de realizar el pedido #${ord.order_number} por ${window.WhipStore.formatARS(ord.total)} y envío mi comprobante.`
+        `¡Hola Whip Helmets! Acabo de realizar el pedido #${ord.order_number} por ${window.WhipStore.formatARS(ord.total)} y envío mi comprobante.`
       );
 
       box.innerHTML = `
@@ -320,26 +325,28 @@
             <div style="font-size:44px;">✅</div>
             <span class="section-eyebrow">Pedido #${ord.order_number} confirmado</span>
             <h1 style="margin:6px 0 8px; font-size:26px;">¡Gracias por tu compra, ${ord.customer_name.split(" ")[0]}!</h1>
-            <p style="font-size:13.5px; color:#6b7280; margin:0 0 22px;">El stock se descontó automáticamente de la base de datos.</p>
+            <p style="font-size:13.5px; color:#6b7280; margin:0 0 22px;">El stock quedó reservado automáticamente.</p>
           </div>
           ${
             ord.payment_method === "TRANSFERENCIA"
               ? `
             <div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:12px; padding:16px; margin-bottom:20px;">
-              <strong style="font-size:14px; color:#065f46;">🏦 Datos para transferir (15% OFF aplicado)</strong>
+              <strong style="font-size:14px; color:#065f46;">🏦 Datos para transferir</strong>
               <div style="background:#fff; border:1px solid #a7f3d0; border-radius:8px; padding:12px; margin:10px 0; font-family:monospace; font-size:13px; line-height:1.7;">
-                <div><strong>Alias:</strong> WHIP.STORE.ARG</div>
-                <div><strong>CBU:</strong> 0000003100084512900412</div>
+                <div><strong>Titular:</strong> {{ TRANSFERENCIA_TITULAR }}</div>
+                ${ "{{ TRANSFERENCIA_CUIL }}" ? `<div><strong>CUIL/CUIT:</strong> {{ TRANSFERENCIA_CUIL }}</div>` : "" }
+                <div><strong>Alias:</strong> {{ TRANSFERENCIA_ALIAS }}</div>
+                <div><strong>CBU:</strong> {{ TRANSFERENCIA_CBU }}</div>
                 <div><strong>Monto exacto:</strong> ${window.WhipStore.formatARS(ord.total)}</div>
               </div>
-              <a href="https://wa.me/549295454401?text=${waText}" target="_blank" class="btn" style="width:100%; background:#25D366; color:#fff;">
-                💬 Enviar comprobante por WhatsApp (2954-544001)
+              <a href="https://wa.me/{{ STORE_WHATSAPP }}?text=${waText}" target="_blank" class="btn" style="width:100%; background:#25D366; color:#fff;">
+                💬 Enviar comprobante por WhatsApp
               </a>
             </div>
           `
               : `
             <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:12px; padding:14px; margin-bottom:20px; font-size:13px; color:#1e3a8a;">
-              <strong>Pago aprobado:</strong> Recibimos tu pedido y te contactaremos para coordinar el despacho por Correo Argentino.
+              <strong>Pedido registrado:</strong> Recibimos tu pedido y te contactaremos para coordinar el despacho por Correo Argentino.
             </div>
           `
           }

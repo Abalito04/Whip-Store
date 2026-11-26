@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Estado del Pago | Whip Store{% endblock %}
+{% block content %}
+<div class="container" style="padding:48px 18px 72px; max-width:600px;">
+  <div class="card-panel" style="padding:32px 26px; text-align:center;">
+    {% if status == 'exitoso' %}
+      <div style="font-size:48px; margin-bottom:10px;">✅</div>
+      <span class="section-eyebrow" style="color:#00A650;">Pago aprobado</span>
+      <h1 style="margin:6px 0 10px; font-size:26px;">¡Gracias por tu compra!</h1>
+      <p style="font-size:14px; color:#4b5563; line-height:1.6; margin:0 0 20px;">
+        Recibimos tu pago por Mercado Pago correctamente.
+        {% if order %}Tu pedido <strong>#{{ order.order_number }}</strong> por <strong>{{ order.total|ars }}</strong> ya está en preparación para despacho por Correo Argentino.{% endif %}
+      </p>
+    {% elif status == 'pendiente' %}
+      <div style="font-size:48px; margin-bottom:10px;">⏳</div>
+      <span class="section-eyebrow" style="color:#d97706;">Pago pendiente</span>
+      <h1 style="margin:6px 0 10px; font-size:26px;">Tu pago está en proceso</h1>
+      <p style="font-size:14px; color:#4b5563; line-height:1.6; margin:0 0 20px;">
+        Apenas Mercado Pago acredite tu pago, confirmaremos tu pedido{% if order %} <strong>#{{ order.order_number }}</strong>{% endif %} y coordinaremos el envío.
+      </p>
+    {% else %}
+      <div style="font-size:48px; margin-bottom:10px;">❌</div>
+      <span class="section-eyebrow" style="color:#e63946;">Pago no completado</span>
+      <h1 style="margin:6px 0 10px; font-size:26px;">No pudimos procesar el pago</h1>
+      <p style="font-size:14px; color:#4b5563; line-height:1.6; margin:0 0 20px;">
+        El pago fue rechazado o cancelado. Podés volver a intentarlo con otro medio de pago o consultarnos por WhatsApp.
+      </p>
+    {% endif %}
+
+    {% if payment_id %}
+      <div style="font-size:12px; color:#6b7280; margin-bottom:20px; font-family:monospace;">
+        Comprobante MP: #{{ payment_id }}
+      </div>
+    {% endif %}
+
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <a href="/" class="btn btn-dark" style="flex:1;">Volver a la tienda</a>
+      <a href="https://wa.me/{{ STORE_WHATSAPP }}?text=%C2%A1Hola%20Whip%20Helmets!%20Consulto%20por%20mi%20pedido{% if order %}%20%23{{ order.order_number }}{% endif %}." target="_blank" rel="noopener" class="btn" style="flex:1; background:#25D366; color:#fff;">
+        💬 Consultar por WhatsApp
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}
