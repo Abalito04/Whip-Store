@@ -97,6 +97,7 @@ def calculate_correo_argentino_quotes(postal_code):
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "whip-store-dev-secret-2026")
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10 MB máx. por subida
+app.config["TEMPLATES_AUTO_RELOAD"] = True
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = bool(os.environ.get("RAILWAY_ENVIRONMENT"))
