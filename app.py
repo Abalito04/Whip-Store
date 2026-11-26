@@ -210,6 +210,11 @@ def inject_globals():
 # ---------------------------------------------------------------------------
 
 
+@app.route("/favicon.ico")
+def favicon():
+    return app.send_static_file("favicon.ico")
+
+
 @app.route("/")
 def home():
     cat_order = {"cascos": 0, "indumentaria": 1, "antiparras": 2, "accesorios": 3}
