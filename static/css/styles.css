@@ -383,7 +383,8 @@ button, input, select {
 }
 .hero-slides {
   position: relative;
-  min-height: 215px;
+  min-height: 185px;
+  margin-bottom: 14px;
 }
 .hero-slide {
   position: absolute;
