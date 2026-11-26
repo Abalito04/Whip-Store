@@ -1,7 +1,16 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
+
+AR_OFFSET = timedelta(hours=-3)
+
+
+def fmt_ar(dt):
+    """Convierte fecha/hora UTC de la base de datos a hora de Argentina (UTC-3)."""
+    if not dt:
+        return None
+    return (dt + AR_OFFSET).strftime("%d/%m/%Y %H:%M")
 
 
 class Category(db.Model):
@@ -168,7 +177,7 @@ class Order(db.Model):
             "total": self.total,
             "stock_deducted": bool(self.stock_deducted),
             "stock_restored": self.stock_restored,
-            "created_at": self.created_at.strftime("%d/%m/%Y %H:%M"),
+            "created_at": fmt_ar(self.created_at),
             "items": [i.to_dict() for i in self.items],
         }
 
@@ -224,7 +233,7 @@ class StockMovement(db.Model):
             "quantity_delta": self.quantity_delta,
             "stock_after": self.stock_after,
             "reason": self.reason or "",
-            "created_at": self.created_at.strftime("%d/%m/%Y %H:%M"),
+            "created_at": fmt_ar(self.created_at),
         }
 
 
@@ -292,8 +301,8 @@ class CashSession(db.Model):
             "expected_cash": self.expected_cash if self.expected_cash is not None else s["expected_cash"],
             "difference": diff,
             "notes": self.notes or "",
-            "opened_at": self.opened_at.strftime("%d/%m/%Y %H:%M"),
-            "closed_at": self.closed_at.strftime("%d/%m/%Y %H:%M") if self.closed_at else None,
+            "opened_at": fmt_ar(self.opened_at),
+            "closed_at": fmt_ar(self.closed_at),
             "summary": s,
         }
         if include_movements:
@@ -322,5 +331,5 @@ class CashMovement(db.Model):
             "payment_method": self.payment_method,
             "amount": self.amount,
             "description": self.description or "",
-            "created_at": self.created_at.strftime("%d/%m/%Y %H:%M"),
+            "created_at": fmt_ar(self.created_at),
         }

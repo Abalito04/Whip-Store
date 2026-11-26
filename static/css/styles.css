@@ -382,20 +382,18 @@ button, input, select {
   max-width: 580px;
 }
 .hero-slides {
-  position: relative;
-  min-height: 142px;
+  display: grid;
+  align-items: start;
   margin-bottom: 6px;
 }
 .hero-slide {
-  position: absolute;
-  inset: 0;
+  grid-area: 1 / 1;
   opacity: 0;
   transform: translateY(10px);
   pointer-events: none;
   transition: opacity 0.55s ease, transform 0.55s ease;
 }
 .hero-slide.active {
-  position: relative;
   opacity: 1;
   transform: translateY(0);
   pointer-events: auto;

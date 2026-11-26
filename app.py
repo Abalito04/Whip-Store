@@ -258,7 +258,7 @@ def sitemap_xml():
     from xml.sax.saxutils import escape as xml_esc
 
     base = _site_base_url()
-    today = datetime.utcnow().strftime("%Y-%m-%d")
+    today = (datetime.utcnow() - timedelta(hours=3)).strftime("%Y-%m-%d")
     urls = [
         (f"{base}/", today, "daily", "1.0"),
         (f"{base}/categoria/cascos", today, "daily", "0.8"),
@@ -271,7 +271,7 @@ def sitemap_xml():
     ]
     active_products = [p for p in Product.query.filter_by(is_active=True).all() if p.total_stock > 0]
     for p in active_products:
-        lastmod = p.created_at.strftime("%Y-%m-%d") if getattr(p, "created_at", None) else today
+        lastmod = (p.created_at - timedelta(hours=3)).strftime("%Y-%m-%d") if getattr(p, "created_at", None) else today
         urls.append((f"{base}/producto/{p.slug}", lastmod, "daily", "0.9"))
 
     xml_items = "".join(
