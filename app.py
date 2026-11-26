@@ -4,7 +4,7 @@ import io
 import os
 import re
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 from flask import Flask, jsonify, redirect, render_template, request, send_file, session
 from sqlalchemy import inspect, text
@@ -96,6 +96,19 @@ def calculate_correo_argentino_quotes(postal_code):
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "whip-store-dev-secret-2026")
+app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10 MB máx. por subida
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = bool(os.environ.get("RAILWAY_ENVIRONMENT"))
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=12)
+
+
+@app.after_request
+def add_security_headers(response):
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    return response
 
 # Base de datos: usa SQLite local en desarrollo y DATABASE_URL automáticamente en Railway
 if os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("WHIP_DATABASE_URL"):
@@ -589,6 +602,48 @@ def _restore_order_stock_if_needed(order, reason_prefix="Pago cancelado/rechazad
     order.stock_restored = True
 
 
+def _verify_and_apply_mp_payment(payment_id, expected_order_number=None, source_label="MP"):
+    """Consulta la API oficial de Mercado Pago para verificar estado y monto real del pago."""
+    mp_access_token = os.environ.get("MP_ACCESS_TOKEN", "").strip()
+    if not mp_access_token or not payment_id:
+        return None
+    try:
+        import mercadopago
+
+        sdk = mercadopago.SDK(mp_access_token)
+        pay_res = sdk.payment().get(payment_id)
+        payment = pay_res.get("response") or {}
+        mp_status = str(payment.get("status") or "").lower()
+        ext_ref = str(payment.get("external_reference") or "").strip()
+        paid_amount = float(payment.get("transaction_amount") or 0)
+
+        if not ext_ref.isdigit():
+            return None
+        order_num = int(ext_ref)
+        if expected_order_number is not None and order_num != int(expected_order_number):
+            return None
+
+        order = Order.query.filter_by(order_number=order_num).first()
+        if not order:
+            return None
+
+        order.mp_payment_id = str(payment_id)
+        if mp_status == "approved" and paid_amount >= float(order.total) * 0.99:
+            order.payment_status = "PAID"
+            if order.shipping_status == "UNFULFILLED":
+                order.shipping_status = "PREPARING"
+            _deduct_order_stock_if_needed(order, f"{source_label} aprobado Pedido")
+        elif mp_status in ("rejected", "cancelled", "refunded", "charged_back"):
+            if order.payment_status != "PAID" or mp_status in ("refunded", "charged_back"):
+                order.payment_status = "CANCELLED"
+                _restore_order_stock_if_needed(order, f"{source_label} ({mp_status}) Pedido")
+        db.session.commit()
+        return order
+    except Exception as exc:
+        print(f"Error verificando pago MP #{payment_id}: {exc}")
+        return None
+
+
 @app.route("/pago/<status>")
 def pago_resultado(status):
     if status not in ("exitoso", "pendiente", "fallido"):
@@ -596,26 +651,22 @@ def pago_resultado(status):
     payment_id = (request.args.get("payment_id") or request.args.get("collection_id") or "").strip()
     ext_ref = (request.args.get("external_reference") or "").strip()
     order = None
+    mp_configured = bool(os.environ.get("MP_ACCESS_TOKEN", "").strip())
+
     if ext_ref.isdigit():
-        order = Order.query.filter_by(order_number=int(ext_ref)).first()
-        if order:
-            if payment_id:
-                order.mp_payment_id = payment_id
-            if status == "exitoso" and order.payment_status != "PAID":
-                order.payment_status = "PAID"
-                if order.shipping_status == "UNFULFILLED":
-                    order.shipping_status = "PREPARING"
-                _deduct_order_stock_if_needed(order, "Pago MP aprobado Pedido")
-            elif status == "fallido" and order.payment_status != "PAID":
-                order.payment_status = "CANCELLED"
-                _restore_order_stock_if_needed(order, "Pago MP fallido Pedido")
-            db.session.commit()
+        expected_num = int(ext_ref)
+        if mp_configured and payment_id:
+            # Solo actualiza el pedido verificando contra la API real de Mercado Pago
+            order = _verify_and_apply_mp_payment(payment_id, expected_order_number=expected_num, source_label="Retorno MP")
+        if not order:
+            order = Order.query.filter_by(order_number=expected_num).first()
+
     return render_template("pago_resultado.html", status=status, order=order, payment_id=payment_id)
 
 
 @app.route("/api/webhooks/mercadopago", methods=["POST", "GET"])
 def api_webhook_mercadopago():
-    """Webhook oficial de Mercado Pago para confirmar pagos, descontar stock al aprobar y revertir en rechazos."""
+    """Webhook oficial de Mercado Pago: verifica el pago contra la API de MP antes de confirmar o revertir stock."""
     mp_access_token = os.environ.get("MP_ACCESS_TOKEN", "").strip()
     if not mp_access_token:
         return jsonify({"ok": True, "ignored": True}), 200
@@ -632,31 +683,7 @@ def api_webhook_mercadopago():
     if not payment_id or (topic and "payment" not in str(topic)):
         return jsonify({"ok": True}), 200
 
-    try:
-        import mercadopago
-
-        sdk = mercadopago.SDK(mp_access_token)
-        pay_res = sdk.payment().get(payment_id)
-        payment = pay_res.get("response") or {}
-        mp_status = payment.get("status")
-        ext_ref = str(payment.get("external_reference") or "").strip()
-
-        if ext_ref.isdigit():
-            order = Order.query.filter_by(order_number=int(ext_ref)).first()
-            if order:
-                order.mp_payment_id = str(payment_id)
-                if mp_status == "approved":
-                    order.payment_status = "PAID"
-                    if order.shipping_status == "UNFULFILLED":
-                        order.shipping_status = "PREPARING"
-                    _deduct_order_stock_if_needed(order, "Webhook MP aprobado Pedido")
-                elif mp_status in ("rejected", "cancelled", "refunded", "charged_back"):
-                    order.payment_status = "CANCELLED"
-                    _restore_order_stock_if_needed(order, f"Webhook MP ({mp_status}) Pedido")
-                db.session.commit()
-    except Exception as exc:
-        print(f"Error procesando webhook MP: {exc}")
-
+    _verify_and_apply_mp_payment(payment_id, source_label="Webhook MP")
     return jsonify({"ok": True}), 200
 
 
@@ -671,8 +698,28 @@ def require_admin():
     return None
 
 
+_LOGIN_ATTEMPTS = {}
+LOGIN_MAX_ATTEMPTS = 5
+LOGIN_WINDOW_SECONDS = 600  # 10 minutos
+
+
+def _client_ip():
+    fwd = request.headers.get("X-Forwarded-For", "")
+    return (fwd.split(",")[0].strip() if fwd else request.remote_addr) or "unknown"
+
+
 @app.route("/api/admin/login", methods=["POST"])
 def api_admin_login():
+    ip = _client_ip()
+    now = time.time()
+    recent = [t for t in _LOGIN_ATTEMPTS.get(ip, []) if now - t < LOGIN_WINDOW_SECONDS]
+    if len(recent) >= LOGIN_MAX_ATTEMPTS:
+        wait_min = max(1, int((LOGIN_WINDOW_SECONDS - (now - recent[0])) // 60) + 1)
+        return jsonify({"ok": False, "error": f"Demasiados intentos fallidos. Esperá {wait_min} min."}), 429
+
+    if os.environ.get("RAILWAY_ENVIRONMENT") and not os.environ.get("ADMIN_PASSWORD", "").strip():
+        return jsonify({"ok": False, "error": "Configurá ADMIN_PASSWORD en las variables de Railway."}), 503
+
     data = request.get_json(silent=True) or {}
     user_in = (data.get("email") or data.get("username") or "").strip().lower()
     password = (data.get("password") or "").strip()
@@ -685,8 +732,13 @@ def api_admin_login():
     expected_password = os.environ.get("ADMIN_PASSWORD", "whip2026").strip()
 
     if hmac.compare_digest(user_in, expected_user) and hmac.compare_digest(password, expected_password):
+        _LOGIN_ATTEMPTS.pop(ip, None)
+        session.permanent = True
         session["admin_authed"] = True
         return jsonify({"ok": True})
+
+    recent.append(now)
+    _LOGIN_ATTEMPTS[ip] = recent
     return jsonify({"ok": False, "error": "Credenciales incorrectas."}), 401
 
 
@@ -1631,4 +1683,4 @@ def api_pos_stock_movement():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", debug=True, port=5000)
+    app.run(host="0.0.0.0", debug=os.environ.get("FLASK_DEBUG") == "1", port=5000)
