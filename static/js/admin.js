@@ -8,6 +8,15 @@
     return "$ " + Math.round(Number(n) || 0).toLocaleString("es-AR");
   }
 
+  function esc(s) {
+    return String(s ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
   async function loadState() {
     const res = await fetch("/api/admin/state");
     if (res.status === 401) {
@@ -162,15 +171,15 @@
               </span>
             </div>
             <div style="font-size:12.5px; color:#4b5563; margin-top:4px;">
-              <strong>${o.customer_name}</strong> · ${o.customer_email} · ${o.customer_phone}
+              <strong>${esc(o.customer_name)}</strong> · ${esc(o.customer_email)} · ${esc(o.customer_phone)}
             </div>
             <div style="font-size:12px; color:#6b7280;">
-              Envío: ${o.shipping_address}, ${o.city} (${o.province}) — CP ${o.postal_code}
+              Envío: ${esc(o.shipping_address)}, ${esc(o.city)} (${esc(o.province)}) — CP ${esc(o.postal_code)}
             </div>
           </div>
           <div style="text-align:right;">
             <strong style="font-size:20px;">${formatARS(o.total)}</strong>
-            <div style="font-size:11px; color:#9ca3af;">${o.created_at}</div>
+            <div style="font-size:11px; color:#9ca3af;">${esc(o.created_at)}</div>
           </div>
         </div>
 
@@ -179,10 +188,10 @@
             .map(
               (item) => `
             <div style="display:flex; align-items:center; gap:10px; font-size:12.5px;">
-              <img src="${item.image_url}" style="width:40px; height:40px; object-fit:contain; background:#f8f9fa; border:1px solid #e5e7eb; border-radius:6px; padding:2px;">
+              <img src="${esc(item.image_url)}" style="width:40px; height:40px; object-fit:contain; background:#f8f9fa; border:1px solid #e5e7eb; border-radius:6px; padding:2px;">
               <div style="flex:1;">
-                <strong>${item.product_name}</strong>
-                <div style="color:#6b7280; font-size:11.5px;">${item.variant_label} × ${item.quantity}</div>
+                <strong>${esc(item.product_name)}</strong>
+                <div style="color:#6b7280; font-size:11.5px;">${esc(item.variant_label)} × ${item.quantity}</div>
               </div>
               <strong>${formatARS(item.unit_price * item.quantity)}</strong>
             </div>
@@ -205,7 +214,7 @@
             <option value="DELIVERED" ${o.shipping_status === "DELIVERED" ? "selected" : ""}>Envío: Entregado</option>
           </select>
 
-          <input type="text" value="${o.tracking_code || ""}" placeholder="Código tracking (ej: CA-12345AR)"
+          <input type="text" value="${esc(o.tracking_code || "")}" placeholder="Código tracking (ej: CA-12345AR)"
             onblur="window.WhipAdmin.updateOrder(${o.id}, {tracking_code: this.value})"
             style="height:36px; padding:0 10px; border-radius:8px; border:1px solid #e5e7eb; font-size:12px; font-family:monospace; flex:1; min-width:190px;">
 

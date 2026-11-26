@@ -1,10 +1,13 @@
 import csv
+import hashlib
 import hmac
 import io
 import os
 import re
 import time
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
 from flask import Flask, Response, jsonify, redirect, render_template, request, send_file, session
 from sqlalchemy import inspect, text
@@ -95,6 +98,7 @@ def calculate_correo_argentino_quotes(postal_code):
     }
 
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 app.secret_key = os.environ.get("SECRET_KEY", "whip-store-dev-secret-2026")
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10 MB máx. por subida
 app.config["TEMPLATES_AUTO_RELOAD"] = True
@@ -103,12 +107,18 @@ app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = bool(os.environ.get("RAILWAY_ENVIRONMENT"))
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=12)
 
+ORDER_RESERVATION_HOURS = int(os.environ.get("ORDER_RESERVATION_HOURS", "24"))
+_LAST_EXPIRY_CHECK_TS = 0.0
+
 
 @app.after_request
 def add_security_headers(response):
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    if os.environ.get("RAILWAY_ENVIRONMENT") or request.is_secure:
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
     return response
 
 # Base de datos: usa SQLite local en desarrollo y DATABASE_URL automáticamente en Railway
@@ -459,8 +469,77 @@ CHECKOUT_WINDOW_SECONDS = 600  # 10 minutos
 
 
 def _client_ip():
-    fwd = request.headers.get("X-Forwarded-For", "")
-    return (fwd.split(",")[0].strip() if fwd else request.remote_addr) or "unknown"
+    return request.remote_addr or "unknown"
+
+
+def _normalize_cart_items(items_req, max_distinct=30, max_qty_per_variant=20):
+    """Consolida ítems por variant_id evitando duplicados, booleanos, negativos o desbordamientos."""
+    if not isinstance(items_req, list) or not items_req or len(items_req) > max_distinct:
+        return None, "Tu carrito está vacío o supera el máximo de ítems permitidos."
+    merged = {}
+    for item in items_req:
+        if not isinstance(item, dict):
+            return None, "Formato de ítem inválido."
+        raw_vid = item.get("variant_id")
+        raw_qty = item.get("quantity", 1)
+        if isinstance(raw_vid, bool) or isinstance(raw_qty, bool):
+            return None, "Cantidad o variante inválida."
+        if isinstance(raw_qty, float) and not raw_qty.is_integer():
+            return None, "La cantidad debe ser un número entero."
+        try:
+            vid = int(raw_vid)
+            qty = int(raw_qty)
+        except (TypeError, ValueError):
+            return None, "Cantidad o variante inválida."
+        if vid <= 0 or qty <= 0 or qty > max_qty_per_variant:
+            return None, "Cantidad fuera del rango permitido."
+        merged[vid] = merged.get(vid, 0) + qty
+        if merged[vid] > max_qty_per_variant:
+            return None, f"Máximo {max_qty_per_variant} unidades por talle."
+    return merged, None
+
+
+def expire_stale_unpaid_orders(force=False):
+    """Vence automáticamente reservas web por Transferencia impagas pasadas ORDER_RESERVATION_HOURS (24h)."""
+    global _LAST_EXPIRY_CHECK_TS
+    now_ts = time.time()
+    if not force and (now_ts - _LAST_EXPIRY_CHECK_TS) < 60:
+        return 0
+    _LAST_EXPIRY_CHECK_TS = now_ts
+    try:
+        cutoff = datetime.utcnow() - timedelta(hours=ORDER_RESERVATION_HOURS)
+        stale_orders = (
+            Order.query.filter(
+                Order.channel == "WEB",
+                Order.payment_method == "TRANSFERENCIA",
+                Order.payment_status == "PENDING",
+                Order.stock_deducted.is_(True),
+                Order.created_at < cutoff,
+            )
+            .with_for_update()
+            .all()
+        )
+        if not stale_orders:
+            return 0
+        for ord_obj in stale_orders:
+            _restore_order_stock_if_needed(
+                ord_obj,
+                reason_prefix=f"Reserva vencida ({ORDER_RESERVATION_HOURS}h) Pedido",
+            )
+            ord_obj.payment_status = "CANCELLED"
+        db.session.commit()
+        return len(stale_orders)
+    except Exception as exc:
+        db.session.rollback()
+        print(f"Error al expirar reservas vencidas: {exc}")
+        return 0
+
+
+@app.before_request
+def _auto_expire_reservations_hook():
+    if request.path.startswith("/static/"):
+        return
+    expire_stale_unpaid_orders(force=False)
 
 
 @app.route("/api/checkout", methods=["POST"])
@@ -470,16 +549,16 @@ def api_checkout():
     recent_co = [t for t in _CHECKOUT_ATTEMPTS.get(ip, []) if now - t < CHECKOUT_WINDOW_SECONDS]
     if len(recent_co) >= CHECKOUT_MAX_ATTEMPTS:
         return jsonify({"ok": False, "error": "Demasiados intentos de compra seguidos. Esperá unos minutos."}), 429
-    recent_co.append(now)
-    _CHECKOUT_ATTEMPTS[ip] = recent_co
+
+    expire_stale_unpaid_orders(force=True)
 
     data = request.get_json(silent=True) or {}
-    items_req = data.get("items") or []
-    if not items_req:
-        return jsonify({"ok": False, "error": "Tu carrito está vacío."}), 400
+    merged_qty, items_err = _normalize_cart_items(data.get("items"))
+    if items_err:
+        return jsonify({"ok": False, "error": items_err}), 400
 
     shipping_option = str(data.get("shipping_option") or "").strip().upper()
-    if not shipping_option:
+    if shipping_option not in ("RETIRO_LOCAL", "CA_SUCURSAL", "CA_DOMICILIO", "CA_EXPRESO"):
         return jsonify({"ok": False, "error": "Elegí si querés envío o retiro en sucursal."}), 400
 
     is_pickup = shipping_option == "RETIRO_LOCAL"
@@ -496,25 +575,40 @@ def api_checkout():
         if not str(data.get(field, "")).strip():
             return jsonify({"ok": False, "error": "Completá todos los campos obligatorios."}), 400
 
-    if str(data.get("payment_method", "")).strip() not in ("TRANSFERENCIA", "MERCADOPAGO"):
+    payment_method = str(data.get("payment_method", "")).strip().upper()
+    if payment_method not in ("TRANSFERENCIA", "MERCADOPAGO"):
         return jsonify({"ok": False, "error": "Seleccioná un medio de pago válido."}), 400
 
-    # Validación y descuento atómico de stock en la base de datos
+    if not is_pickup:
+        quote = calculate_correo_argentino_quotes(data.get("postal_code"))
+        if not quote:
+            return jsonify({"ok": False, "error": "Ingresá un Código Postal válido de 4 dígitos."}), 400
+
+    recent_co.append(now)
+    _CHECKOUT_ATTEMPTS[ip] = recent_co
+
+    # Validación y descuento atómico de stock con bloqueo de filas (FOR UPDATE)
     try:
+        locked_variants = (
+            ProductVariant.query.filter(ProductVariant.id.in_(sorted(merged_qty.keys())))
+            .order_by(ProductVariant.id.asc())
+            .with_for_update()
+            .all()
+        )
+        variant_map = {v.id: v for v in locked_variants}
+
         subtotal = 0
         order_items_to_create = []
 
-        for item in items_req:
-            variant_id = int(item.get("variant_id", 0))
-            qty = int(item.get("quantity", 1))
-            if qty <= 0:
-                return jsonify({"ok": False, "error": "Cantidad inválida."}), 400
-
-            variant = db.session.get(ProductVariant, variant_id)
+        for variant_id in sorted(merged_qty.keys()):
+            qty = merged_qty[variant_id]
+            variant = variant_map.get(variant_id)
             if not variant or not variant.product or not variant.product.is_active:
+                db.session.rollback()
                 return jsonify({"ok": False, "error": "Uno de los productos ya no está disponible."}), 400
 
             if variant.stock < qty:
+                db.session.rollback()
                 return (
                     jsonify(
                         {
@@ -528,13 +622,13 @@ def api_checkout():
             subtotal += variant.product.price * qty
             order_items_to_create.append((variant, qty))
 
-        payment_method = data["payment_method"]
         if payment_method == "TRANSFERENCIA":
             discount_amount = sum(
                 max(0, (v.product.price - v.product.transfer_price)) * q for v, q in order_items_to_create
             )
         else:
             discount_amount = 0
+
         if is_pickup:
             shipping_cost = 0
             ship_addr = "Retiro en sucursal (Santa Rosa, La Pampa)"
@@ -542,19 +636,15 @@ def api_checkout():
             ship_city = "Santa Rosa"
             ship_prov = "La Pampa"
         else:
-            quote = calculate_correo_argentino_quotes(data.get("postal_code"))
-            if quote:
-                opt_match = next((o for o in quote["options"] if o["code"] == shipping_option), None)
-                shipping_cost = opt_match["price"] if opt_match else quote["options"][1]["price"]
-            else:
-                shipping_cost = 13800
-            ship_addr = data["shipping_address"].strip()
-            ship_cp = data["postal_code"].strip()
-            ship_city = data["city"].strip()
-            ship_prov = data["province"].strip()
+            opt_match = next((o for o in quote["options"] if o["code"] == shipping_option), None)
+            shipping_cost = opt_match["price"] if opt_match else quote["options"][1]["price"]
+            ship_addr = data["shipping_address"].strip()[:200]
+            ship_cp = data["postal_code"].strip()[:20]
+            ship_city = data["city"].strip()[:100]
+            ship_prov = data["province"].strip()[:100]
         total = max(0, subtotal - discount_amount + shipping_cost)
 
-        last_order = Order.query.order_by(Order.order_number.desc()).first()
+        last_order = Order.query.order_by(Order.order_number.desc()).with_for_update().first()
         next_number = (last_order.order_number + 1) if last_order else 1001
 
         mp_access_token = os.environ.get("MP_ACCESS_TOKEN", "").strip()
@@ -562,9 +652,9 @@ def api_checkout():
 
         new_order = Order(
             order_number=next_number,
-            customer_name=data["customer_name"].strip(),
-            customer_email=data["customer_email"].strip(),
-            customer_phone=data["customer_phone"].strip(),
+            customer_name=data["customer_name"].strip()[:120],
+            customer_email=data["customer_email"].strip()[:120],
+            customer_phone=data["customer_phone"].strip()[:50],
             shipping_address=ship_addr,
             postal_code=ship_cp,
             city=ship_city,
@@ -606,6 +696,7 @@ def api_checkout():
                 )
 
         db.session.commit()
+        session["last_order_number"] = new_order.order_number
 
         # Si hay MP_ACCESS_TOKEN configurado, crear Preferencia real de Mercado Pago Checkout Pro
         if is_mp_real:
@@ -674,8 +765,12 @@ def _deduct_order_stock_if_needed(order, reason_prefix="Pago MP aprobado Pedido"
         return
     for item in order.items:
         if item.variant_id:
-            variant = db.session.get(ProductVariant, item.variant_id)
+            variant = ProductVariant.query.filter_by(id=item.variant_id).with_for_update().first()
             if variant:
+                if variant.stock < item.quantity:
+                    shortage = item.quantity - variant.stock
+                    alert = f"[ALERTA STOCK: faltan {shortage} u. de {variant.sku}]"
+                    order.notes = f"{order.notes or ''} {alert}".strip()[:255]
                 deducted = min(variant.stock, item.quantity)
                 variant.stock = max(0, variant.stock - item.quantity)
                 if deducted > 0:
@@ -687,15 +782,16 @@ def _deduct_order_stock_if_needed(order, reason_prefix="Pago MP aprobado Pedido"
                         order_id=order.id,
                     )
     order.stock_deducted = True
+    order.stock_restored = False
 
 
 def _restore_order_stock_if_needed(order, reason_prefix="Pago cancelado/rechazado"):
     """Devuelve el stock solo si previamente llegó a descontarse."""
-    if not order or order.stock_restored or not order.stock_deducted:
+    if not order or not order.stock_deducted:
         return
     for item in order.items:
         if item.variant_id:
-            variant = db.session.get(ProductVariant, item.variant_id)
+            variant = ProductVariant.query.filter_by(id=item.variant_id).with_for_update().first()
             if variant:
                 variant.stock += item.quantity
                 record_stock_movement(
@@ -706,10 +802,34 @@ def _restore_order_stock_if_needed(order, reason_prefix="Pago cancelado/rechazad
                     order_id=order.id,
                 )
     order.stock_restored = True
+    order.stock_deducted = False
+
+
+def _verify_mp_webhook_signature(payment_id):
+    """Verifica la firma HMAC-SHA256 oficial de Mercado Pago (x-signature) si MP_WEBHOOK_SECRET está configurada."""
+    secret = os.environ.get("MP_WEBHOOK_SECRET", "").strip()
+    if not secret:
+        return True
+    sig_header = request.headers.get("x-signature", "").strip()
+    req_id = request.headers.get("x-request-id", "").strip()
+    if not sig_header:
+        return False
+    parts = {}
+    for kv in sig_header.split(","):
+        if "=" in kv:
+            k, v = kv.split("=", 1)
+            parts[k.strip()] = v.strip()
+    ts = parts.get("ts", "")
+    v1 = parts.get("v1", "")
+    if not ts or not v1:
+        return False
+    manifest = f"id:{payment_id};request-id:{req_id};ts:{ts};"
+    expected = hmac.new(secret.encode("utf-8"), manifest.encode("utf-8"), hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, v1.lower())
 
 
 def _verify_and_apply_mp_payment(payment_id, expected_order_number=None, source_label="MP"):
-    """Consulta la API oficial de Mercado Pago para verificar estado y monto real del pago."""
+    """Consulta la API oficial de Mercado Pago para verificar estado, moneda, unicidad y monto real del pago."""
     mp_access_token = os.environ.get("MP_ACCESS_TOKEN", "").strip()
     if not mp_access_token or not payment_id:
         return None
@@ -720,21 +840,30 @@ def _verify_and_apply_mp_payment(payment_id, expected_order_number=None, source_
         pay_res = sdk.payment().get(payment_id)
         payment = pay_res.get("response") or {}
         mp_status = str(payment.get("status") or "").lower()
+        currency = str(payment.get("currency_id") or "").upper()
         ext_ref = str(payment.get("external_reference") or "").strip()
         paid_amount = float(payment.get("transaction_amount") or 0)
 
-        if not ext_ref.isdigit():
+        if currency != "ARS" or not ext_ref.isdigit():
             return None
         order_num = int(ext_ref)
         if expected_order_number is not None and order_num != int(expected_order_number):
             return None
 
-        order = Order.query.filter_by(order_number=order_num).first()
+        order = Order.query.filter_by(order_number=order_num).with_for_update().first()
         if not order:
             return None
 
-        order.mp_payment_id = str(payment_id)
-        if mp_status == "approved" and paid_amount >= float(order.total) * 0.99:
+        # Evitar reutilización de un mismo payment_id en otra orden distinta
+        dup_order = Order.query.filter(
+            Order.mp_payment_id == str(payment_id),
+            Order.id != order.id,
+        ).first()
+        if dup_order:
+            return None
+
+        order.mp_payment_id = str(payment_id)[:100]
+        if mp_status == "approved" and paid_amount >= (float(order.total) - 1.0):
             order.payment_status = "PAID"
             if order.shipping_status == "UNFULFILLED":
                 order.shipping_status = "PREPARING"
@@ -746,6 +875,7 @@ def _verify_and_apply_mp_payment(payment_id, expected_order_number=None, source_
         db.session.commit()
         return order
     except Exception as exc:
+        db.session.rollback()
         print(f"Error verificando pago MP #{payment_id}: {exc}")
         return None
 
@@ -764,15 +894,15 @@ def pago_resultado(status):
         if mp_configured and payment_id:
             # Solo actualiza el pedido verificando contra la API real de Mercado Pago
             order = _verify_and_apply_mp_payment(payment_id, expected_order_number=expected_num, source_label="Retorno MP")
-        if not order:
-            order = Order.query.filter_by(order_number=expected_num).first()
+        if not order and (session.get("last_order_number") == expected_num or session.get("admin_authed")):
+            order = Order.query.filter_by(order_number=expected_num, channel="WEB").first()
 
     return render_template("pago_resultado.html", status=status, order=order, payment_id=payment_id)
 
 
 @app.route("/api/webhooks/mercadopago", methods=["POST", "GET"])
 def api_webhook_mercadopago():
-    """Webhook oficial de Mercado Pago: verifica el pago contra la API de MP antes de confirmar o revertir stock."""
+    """Webhook oficial de Mercado Pago: verifica firma (si existe) y consulta API oficial de MP."""
     mp_access_token = os.environ.get("MP_ACCESS_TOKEN", "").strip()
     if not mp_access_token:
         return jsonify({"ok": True, "ignored": True}), 200
@@ -789,6 +919,9 @@ def api_webhook_mercadopago():
     if not payment_id or (topic and "payment" not in str(topic)):
         return jsonify({"ok": True}), 200
 
+    if not _verify_mp_webhook_signature(payment_id):
+        return jsonify({"ok": False, "error": "Firma de webhook inválida"}), 401
+
     _verify_and_apply_mp_payment(payment_id, source_label="Webhook MP")
     return jsonify({"ok": True}), 200
 
@@ -798,9 +931,30 @@ def api_webhook_mercadopago():
 # ---------------------------------------------------------------------------
 
 
+def _check_same_origin():
+    """Protección anti-CSRF para peticiones que mutan estado (POST / PATCH / DELETE)."""
+    if request.method in ("GET", "HEAD", "OPTIONS"):
+        return None
+    if request.headers.get("Sec-Fetch-Site", "").lower() == "cross-site":
+        return jsonify({"ok": False, "error": "Solicitud cross-site bloqueada (CSRF)."}), 403
+    req_host = (request.host or "").lower()
+    origin = request.headers.get("Origin", "").strip()
+    if origin:
+        if (urlparse(origin).netloc or "").lower() != req_host:
+            return jsonify({"ok": False, "error": "Origen no autorizado (CSRF)."}), 403
+        return None
+    referer = request.headers.get("Referer", "").strip()
+    if referer and (urlparse(referer).netloc or "").lower() != req_host:
+        return jsonify({"ok": False, "error": "Referer no autorizado (CSRF)."}), 403
+    return None
+
+
 def require_admin():
     if not session.get("admin_authed"):
         return jsonify({"ok": False, "error": "No autorizado"}), 401
+    csrf_err = _check_same_origin()
+    if csrf_err:
+        return csrf_err
     return None
 
 
@@ -845,6 +999,9 @@ def api_admin_login():
 
 @app.route("/api/admin/logout", methods=["POST"])
 def api_admin_logout():
+    csrf_err = _check_same_origin()
+    if csrf_err:
+        return csrf_err
     session.pop("admin_authed", None)
     return jsonify({"ok": True})
 
@@ -950,6 +1107,18 @@ def api_pos_web_orders_ping():
     return jsonify({"ok": True, "latest_id": latest_id, "new_orders": payload})
 
 
+def _sanitize_image_urls(raw_list):
+    """Permite únicamente rutas locales (/static/...) o URLs http(s) válidas."""
+    if not isinstance(raw_list, list):
+        return []
+    cleaned = []
+    for item in raw_list:
+        u = str(item or "").strip()
+        if u.startswith("/static/") or u.startswith("https://") or u.startswith("http://"):
+            cleaned.append(u[:500])
+    return cleaned
+
+
 @app.route("/api/admin/upload-image", methods=["POST"])
 def api_admin_upload_image():
     unauth = require_admin()
@@ -963,6 +1132,19 @@ def api_admin_upload_image():
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in (".png", ".jpg", ".jpeg", ".webp", ".gif"):
         return jsonify({"ok": False, "error": "Formato no permitido. Usá PNG, JPG o WEBP."}), 400
+
+    # Verificación binaria real con Pillow para impedir subida de archivos no-imagen disfrazados
+    try:
+        from PIL import Image
+
+        img_check = Image.open(file.stream)
+        img_fmt = (img_check.format or "").upper()
+        img_check.verify()
+        file.stream.seek(0)
+        if img_fmt not in ("PNG", "JPEG", "WEBP", "GIF"):
+            return jsonify({"ok": False, "error": "El archivo no es una imagen válida."}), 400
+    except Exception:
+        return jsonify({"ok": False, "error": "El archivo subido está dañado o no es una imagen válida."}), 400
 
     # Si Cloudinary está configurado en variables de entorno, subir allí (persistente en Railway)
     cld_name = os.environ.get("CLOUDINARY_CLOUD_NAME", "").strip()
@@ -1035,8 +1217,7 @@ def api_admin_product(product_id):
         if "subcategory" in data:
             product.subcategory = str(data["subcategory"] or "").strip().lower()
         if "images" in data and isinstance(data["images"], list):
-            cleaned_imgs = [str(u).strip() for u in data["images"] if str(u).strip()]
-            product.images_json = cleaned_imgs
+            product.images_json = _sanitize_image_urls(data["images"])
 
         if "variants" in data and isinstance(data["variants"], list):
             existing_map = {v.id: v for v in product.variants}
@@ -1117,7 +1298,7 @@ def api_admin_create_product():
     color = (data.get("color") or "Negro Mate").strip()
     description = (data.get("description") or "").strip() or "Producto cargado desde el gestor Whip POS."
     raw_imgs = data.get("images") if isinstance(data.get("images"), list) else []
-    cleaned_imgs = [str(u).strip() for u in raw_imgs if str(u).strip()]
+    cleaned_imgs = _sanitize_image_urls(raw_imgs)
     if not cleaned_imgs:
         cleaned_imgs = ["/static/images/cat-cascos.jpg"]
     stock_s = max(0, int(data.get("stock_s") or 0))
@@ -1444,24 +1625,58 @@ def api_admin_import_products():
         return jsonify({"ok": False, "error": f"Error durante la importación: {exc}"}), 500
 
 
+def _revert_order_cash_movements(order):
+    """Revierte movimientos de caja asociados a una venta anulada si aún no se revirtieron."""
+    linked_movs = CashMovement.query.filter_by(order_id=order.id, movement_type="VENTA").all()
+    if not linked_movs:
+        return
+    already_reverted = CashMovement.query.filter_by(order_id=order.id, movement_type="EGRESO").first()
+    open_session = CashSession.query.filter_by(status="OPEN").order_by(CashSession.id.desc()).first()
+    for mov in linked_movs:
+        if open_session and mov.session_id == open_session.id:
+            db.session.delete(mov)
+        elif open_session and mov.payment_method == "EFECTIVO" and not already_reverted:
+            db.session.add(
+                CashMovement(
+                    session_id=open_session.id,
+                    order_id=order.id,
+                    movement_type="EGRESO",
+                    payment_method="EFECTIVO",
+                    amount=mov.amount,
+                    description=f"Anulación Venta #{order.order_number} (turno anterior)",
+                )
+            )
+
+
 @app.route("/api/admin/order/<int:order_id>", methods=["PATCH"])
 def api_admin_update_order(order_id):
     unauth = require_admin()
     if unauth:
         return unauth
-    order = db.session.get(Order, order_id)
+    order = Order.query.filter_by(id=order_id).with_for_update().first()
     if not order:
         return jsonify({"ok": False, "error": "Pedido no encontrado"}), 404
 
     data = request.get_json(silent=True) or {}
     if "payment_status" in data:
-        order.payment_status = data["payment_status"]
-        if order.payment_status == "PAID":
+        new_pay = str(data["payment_status"] or "").strip().upper()
+        if new_pay not in ("PENDING", "PAID", "CANCELLED"):
+            return jsonify({"ok": False, "error": "Estado de pago inválido."}), 400
+        order.payment_status = new_pay
+        if new_pay == "PAID":
             _deduct_order_stock_if_needed(order, "Pago confirmado manualmente Pedido")
+        elif new_pay == "CANCELLED":
+            _restore_order_stock_if_needed(order, "Cancelación manual Pedido")
+            _revert_order_cash_movements(order)
+
     if "shipping_status" in data:
-        order.shipping_status = data["shipping_status"]
+        new_ship = str(data["shipping_status"] or "").strip().upper()
+        if new_ship not in ("UNFULFILLED", "PREPARING", "SHIPPED", "DELIVERED"):
+            return jsonify({"ok": False, "error": "Estado de envío inválido."}), 400
+        order.shipping_status = new_ship
+
     if "tracking_code" in data:
-        order.tracking_code = (data["tracking_code"] or "").strip()
+        order.tracking_code = str(data["tracking_code"] or "").strip()[:80]
         if order.tracking_code and order.shipping_status in ("UNFULFILLED", "PREPARING"):
             order.shipping_status = "SHIPPED"
 
@@ -1474,33 +1689,15 @@ def api_admin_restore_stock(order_id):
     unauth = require_admin()
     if unauth:
         return unauth
-    order = db.session.get(Order, order_id)
+    order = Order.query.filter_by(id=order_id).with_for_update().first()
     if not order:
         return jsonify({"ok": False, "error": "Pedido no encontrado"}), 404
-    if order.stock_restored:
+    if order.payment_status == "CANCELLED" and not order.stock_deducted:
         return jsonify({"ok": True, "order": order.to_dict()})
 
     _restore_order_stock_if_needed(order, "Anulación Pedido")
     order.payment_status = "CANCELLED"
-
-    # Revertir impacto en la Caja Diaria abierta
-    linked_movs = CashMovement.query.filter_by(order_id=order.id, movement_type="VENTA").all()
-    if linked_movs:
-        open_session = CashSession.query.filter_by(status="OPEN").order_by(CashSession.id.desc()).first()
-        for mov in linked_movs:
-            if open_session and mov.session_id == open_session.id:
-                db.session.delete(mov)
-            elif open_session and mov.payment_method == "EFECTIVO":
-                db.session.add(
-                    CashMovement(
-                        session_id=open_session.id,
-                        order_id=order.id,
-                        movement_type="EGRESO",
-                        payment_method="EFECTIVO",
-                        amount=mov.amount,
-                        description=f"Anulación Venta #{order.order_number} (turno anterior)",
-                    )
-                )
+    _revert_order_cash_movements(order)
 
     db.session.commit()
     return jsonify({"ok": True, "order": order.to_dict()})
@@ -1605,20 +1802,40 @@ def api_pos_create_sale():
     notes = (data.get("notes") or "").strip()
 
     try:
+        merged_qty, items_err = _normalize_cart_items(items_req, max_distinct=50, max_qty_per_variant=50)
+        if items_err:
+            return jsonify({"ok": False, "error": items_err}), 400
+
+        price_overrides = {}
+        for item in items_req:
+            if isinstance(item, dict) and item.get("unit_price"):
+                try:
+                    up = int(item["unit_price"])
+                    if up > 0:
+                        price_overrides[int(item["variant_id"])] = up
+                except (TypeError, ValueError, KeyError):
+                    pass
+
+        locked_variants = (
+            ProductVariant.query.filter(ProductVariant.id.in_(sorted(merged_qty.keys())))
+            .order_by(ProductVariant.id.asc())
+            .with_for_update()
+            .all()
+        )
+        variant_map = {v.id: v for v in locked_variants}
+
         subtotal = 0
         order_items_to_create = []
 
-        for item in items_req:
-            variant_id = int(item.get("variant_id", 0))
-            qty = int(item.get("quantity", 1))
-            if qty <= 0:
-                return jsonify({"ok": False, "error": "Cantidad inválida."}), 400
-
-            variant = db.session.get(ProductVariant, variant_id)
+        for variant_id in sorted(merged_qty.keys()):
+            qty = merged_qty[variant_id]
+            variant = variant_map.get(variant_id)
             if not variant or not variant.product:
+                db.session.rollback()
                 return jsonify({"ok": False, "error": "Variante no encontrada."}), 404
 
             if variant.stock < qty:
+                db.session.rollback()
                 return (
                     jsonify(
                         {
@@ -1629,7 +1846,7 @@ def api_pos_create_sale():
                     409,
                 )
 
-            unit_price = int(item.get("unit_price") or variant.product.price)
+            unit_price = price_overrides.get(variant_id, variant.product.price)
             subtotal += unit_price * qty
             order_items_to_create.append((variant, qty, unit_price))
 
@@ -1643,7 +1860,7 @@ def api_pos_create_sale():
         discount_amount = min(subtotal, manual_discount + auto_discount)
         total = max(0, subtotal - discount_amount)
 
-        last_order = Order.query.order_by(Order.order_number.desc()).first()
+        last_order = Order.query.order_by(Order.order_number.desc()).with_for_update().first()
         next_number = (last_order.order_number + 1) if last_order else 1001
 
         new_order = Order(

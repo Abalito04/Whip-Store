@@ -422,7 +422,9 @@
             <div style="font-size:44px;">✅</div>
             <span class="section-eyebrow">Pedido #${esc(ord.order_number)} confirmado</span>
             <h1 style="margin:6px 0 8px; font-size:26px;">¡Gracias por tu compra, ${esc((ord.customer_name || "").split(" ")[0])}!</h1>
-            <p style="font-size:13.5px; color:#6b7280; margin:0 0 22px;">El stock quedó reservado automáticamente.</p>
+            <p style="font-size:13.5px; color:#6b7280; margin:0 0 22px;">
+              ${ord.payment_method === "TRANSFERENCIA" ? "El stock quedó reservado por <strong>24 horas</strong> hasta recibir tu comprobante de pago." : "El stock quedó reservado automáticamente."}
+            </p>
           </div>
           ${
             ord.payment_method === "TRANSFERENCIA"
