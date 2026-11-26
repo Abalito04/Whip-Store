@@ -366,10 +366,13 @@
     btn.textContent = "Procesando venta...";
 
     try {
+      const payRef = (document.getElementById("posPaymentRef")?.value || "").trim();
       const payload = {
         items: state.cart.map((c) => ({ variant_id: c.variant_id, quantity: c.quantity, unit_price: c.price })),
         channel: state.channel,
         payment_method: state.paymentMethod,
+        payment_ref: payRef,
+        notes: payRef ? `Comp: ${payRef}` : "",
         apply_transfer_discount: Boolean(document.getElementById("posApplyTransferDiscount")?.checked),
         discount_amount: parseInt(document.getElementById("posManualDiscount")?.value || "0", 10) || 0,
         customer_name: document.getElementById("posCustomerName")?.value.trim() || "Cliente Mostrador",
@@ -391,7 +394,8 @@
       document.getElementById("posManualDiscount").value = "0";
       document.getElementById("posCustomerName").value = "";
       document.getElementById("posCustomerPhone").value = "";
-      document.getElementById("posApplyTransferDiscount").checked = false;
+      if (document.getElementById("posPaymentRef")) document.getElementById("posPaymentRef").value = "";
+      document.getElementById("posApplyTransferDiscount").checked = state.paymentMethod === "EFECTIVO" || state.paymentMethod === "TRANSFERENCIA";
 
       toast(`✅ Venta #${data.order.order_number} registrada` + (data.cash_recorded ? " y sumada a Caja" : ""));
       openReceiptModal(data.order);
@@ -404,7 +408,10 @@
     }
   }
 
+  let currentReceiptOrder = null;
+
   function openReceiptModal(order) {
+    currentReceiptOrder = order;
     const area = document.getElementById("receiptPrintArea");
     const waBtn = document.getElementById("receiptWhatsappBtn");
     const itemsRows = (order.items || [])
@@ -423,6 +430,7 @@
       <div><strong>Ticket:</strong> #${order.order_number}</div>
       <div><strong>Fecha:</strong> ${order.created_at}</div>
       <div><strong>Canal:</strong> ${order.channel} · <strong>Pago:</strong> ${order.payment_method}</div>
+      ${order.notes ? `<div><strong>Comprobante:</strong> ${order.notes.replace(/^Comp:\s*/i, "")}</div>` : ""}
       <div><strong>Cliente:</strong> ${order.customer_name}</div>
       <div class="receipt-divider"></div>
       ${itemsRows}
@@ -431,7 +439,7 @@
       ${order.discount_amount > 0 ? `<div style="display:flex; justify-content:space-between;"><span>Descuento:</span><span>-${fmt(order.discount_amount)}</span></div>` : ""}
       <div style="display:flex; justify-content:space-between; font-size:16px; font-weight:800; margin-top:4px;"><span>TOTAL:</span><span>${fmt(order.total)}</span></div>
       <div class="receipt-divider"></div>
-      <div style="text-align:center; font-size:11px;">¡Gracias por elegir Whip Store!<br>whip-helmets.com.ar</div>
+      <div style="text-align:center; font-size:11px;">¡Gracias por elegir Whip Store!<br>Santa Rosa, La Pampa</div>
     `;
 
     const waText = encodeURIComponent(
@@ -443,6 +451,154 @@
     waBtn.href = cleanPhone.length >= 8 ? `https://wa.me/549${cleanPhone}?text=${waText}` : `https://wa.me/?text=${waText}`;
 
     document.getElementById("receiptModal").classList.add("open");
+  }
+
+  function renderReceiptToBlob(order) {
+    return new Promise((resolve) => {
+      const items = order.items || [];
+      const W = 440;
+      const lineH = 22;
+      const H = 310 + items.length * 46 + (order.discount_amount > 0 ? 24 : 0);
+
+      const canvas = document.createElement("canvas");
+      canvas.width = W * 2;
+      canvas.height = H * 2;
+      const ctx = canvas.getContext("2d");
+      ctx.scale(2, 2);
+
+      // Fondo blanco
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = "#e5e7eb";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
+
+      let y = 34;
+      const pad = 24;
+
+      const drawDash = () => {
+        ctx.save();
+        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = "#9ca3af";
+        ctx.beginPath();
+        ctx.moveTo(pad, y);
+        ctx.lineTo(W - pad, y);
+        ctx.stroke();
+        ctx.restore();
+        y += 18;
+      };
+
+      ctx.fillStyle = "#111111";
+      ctx.font = "bold 18px 'Courier New', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("WHIP HELMETS ARGENTINA", W / 2, y);
+      y += 18;
+      ctx.fillStyle = "#6b7280";
+      ctx.font = "12px 'Courier New', monospace";
+      ctx.fillText("Comprobante interno de venta", W / 2, y);
+      y += 14;
+      drawDash();
+
+      ctx.textAlign = "left";
+      ctx.fillStyle = "#111111";
+      ctx.font = "13px 'Courier New', monospace";
+      ctx.fillText(`Ticket:  #${order.order_number}`, pad, y); y += lineH;
+      ctx.fillText(`Fecha:   ${order.created_at}`, pad, y); y += lineH;
+      ctx.fillText(`Canal:   ${order.channel}  |  Pago: ${order.payment_method}`, pad, y); y += lineH;
+      ctx.fillText(`Cliente: ${order.customer_name}`, pad, y); y += 16;
+      drawDash();
+
+      for (const i of items) {
+        const title = `${i.quantity}x ${i.product_name}`.slice(0, 32);
+        ctx.fillStyle = "#111111";
+        ctx.font = "bold 13px 'Courier New', monospace";
+        ctx.textAlign = "left";
+        ctx.fillText(title, pad, y);
+        ctx.textAlign = "right";
+        ctx.fillText(fmt(i.unit_price * i.quantity), W - pad, y);
+        y += 17;
+        ctx.fillStyle = "#6b7280";
+        ctx.font = "11.5px 'Courier New', monospace";
+        ctx.textAlign = "left";
+        ctx.fillText(String(i.variant_label || "").slice(0, 40), pad, y);
+        y += 24;
+      }
+
+      drawDash();
+      ctx.fillStyle = "#4b5563";
+      ctx.font = "13px 'Courier New', monospace";
+      ctx.textAlign = "left";
+      ctx.fillText("Subtotal:", pad, y);
+      ctx.textAlign = "right";
+      ctx.fillText(fmt(order.subtotal), W - pad, y);
+      y += lineH;
+
+      if (order.discount_amount > 0) {
+        ctx.fillStyle = "#00a650";
+        ctx.textAlign = "left";
+        ctx.fillText("Descuento:", pad, y);
+        ctx.textAlign = "right";
+        ctx.fillText("-" + fmt(order.discount_amount), W - pad, y);
+        y += lineH;
+      }
+
+      ctx.fillStyle = "#111111";
+      ctx.font = "bold 18px 'Courier New', monospace";
+      ctx.textAlign = "left";
+      ctx.fillText("TOTAL:", pad, y + 4);
+      ctx.textAlign = "right";
+      ctx.fillText(fmt(order.total), W - pad, y + 4);
+      y += 22;
+      drawDash();
+
+      ctx.fillStyle = "#4b5563";
+      ctx.font = "12px 'Courier New', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("¡Gracias por elegir Whip Store!", W / 2, y);
+      y += 17;
+      ctx.fillText("Santa Rosa, La Pampa", W / 2, y);
+
+      canvas.toBlob((blob) => resolve(blob), "image/png");
+    });
+  }
+
+  async function shareReceiptImage() {
+    if (!currentReceiptOrder) return;
+    const blob = await renderReceiptToBlob(currentReceiptOrder);
+    if (!blob) return;
+
+    const filename = `ticket-whip-${currentReceiptOrder.order_number}.png`;
+    const file = new File([blob], filename, { type: "image/png" });
+
+    // 1. En celular: compartir directo a WhatsApp como imagen
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: `Ticket #${currentReceiptOrder.order_number}` });
+        return;
+      } catch {
+        // si el usuario cancela, seguimos al fallback
+      }
+    }
+
+    // 2. En PC: copiar imagen al portapapeles (listo para Ctrl+V en WhatsApp Web)
+    if (navigator.clipboard && window.ClipboardItem) {
+      try {
+        await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+        toast("📋 Ticket copiado como imagen — pegalo con Ctrl+V en WhatsApp");
+        return;
+      } catch {
+        // fallback a descarga
+      }
+    }
+
+    // 3. Fallback universal: descargar PNG
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    toast("📥 Ticket descargado como imagen PNG");
   }
 
   // ---------------- CAJA DIARIA ----------------
@@ -611,24 +767,60 @@
       if (prev) sel.value = prev;
     }
 
-    const body = document.getElementById("stockMovementsBody");
-    if (!body) return;
-    body.innerHTML = state.recentMovements.length
-      ? state.recentMovements
-          .map((m) => {
-            const pos = m.quantity_delta > 0;
-            return `<tr>
-              <td>${m.created_at}</td>
-              <td><span class="ch-badge ${m.movement_type === "VENTA_WEB" ? "ch-WEB" : m.movement_type === "VENTA_LOCAL" ? "ch-LOCAL" : "ch-WHATSAPP"}">${m.movement_type}</span></td>
-              <td><strong>${m.product_name}</strong><div style="font-size:11.5px; color:var(--muted);">${m.variant_label}</div></td>
-              <td style="font-family:monospace; font-size:12px;">${m.sku}</td>
-              <td class="${pos ? "mov-pos" : "mov-neg"}">${pos ? "+" : ""}${m.quantity_delta}</td>
-              <td><strong>${m.stock_after}</strong></td>
-              <td style="color:var(--muted); font-size:12.5px;">${m.reason}</td>
-            </tr>`;
-          })
-          .join("")
-      : `<tr><td colspan="7" style="text-align:center; color:var(--muted); padding:24px;">Aún no hay movimientos de stock registrados.</td></tr>`;
+    const wrap = document.getElementById("stockMovementsGrouped");
+    if (!wrap) return;
+    if (!state.recentMovements.length) {
+      wrap.innerHTML = `<div class="card-panel" style="padding:24px; text-align:center; color:#6b7280;">Aún no hay movimientos de stock registrados.</div>`;
+      return;
+    }
+
+    const groups = new Map();
+    for (const m of state.recentMovements) {
+      const dateKey = (m.created_at || "Sin fecha").split(" ")[0];
+      if (!groups.has(dateKey)) groups.set(dateKey, []);
+      groups.get(dateKey).push(m);
+    }
+
+    let gIdx = 0;
+    const htmlParts = [];
+    for (const [dateKey, list] of groups.entries()) {
+      const openAttr = gIdx === 0 ? "open" : "";
+      gIdx++;
+      const rowsHtml = list
+        .map((m) => {
+          const pos = m.quantity_delta > 0;
+          const timePart = (m.created_at || "").split(" ")[1] || "";
+          return `<tr>
+            <td style="white-space:nowrap;">${timePart || m.created_at}</td>
+            <td><span class="ch-badge ${m.movement_type === "VENTA_WEB" ? "ch-WEB" : m.movement_type === "VENTA_LOCAL" ? "ch-LOCAL" : "ch-WHATSAPP"}">${m.movement_type}</span></td>
+            <td><strong>${m.product_name}</strong><div style="font-size:11.5px; color:#6b7280;">${m.variant_label}</div></td>
+            <td style="font-family:monospace; font-size:12px;">${m.sku}</td>
+            <td class="${pos ? "mov-pos" : "mov-neg"}">${pos ? "+" : ""}${m.quantity_delta}</td>
+            <td><strong>${m.stock_after}</strong></td>
+            <td style="color:#6b7280; font-size:12.5px;">${m.reason}</td>
+          </tr>`;
+        })
+        .join("");
+
+      htmlParts.push(`
+        <details class="card-panel" style="padding:0; overflow:hidden; margin-bottom:0;" ${openAttr}>
+          <summary style="padding:13px 18px; background:#f8f9fa; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; cursor:pointer; list-style:none;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <strong style="font-size:14px; color:#111;">📅 ${dateKey}</strong>
+              <span style="font-size:12px; font-weight:700; color:#6b7280;">${list.length} movimiento(s)</span>
+            </div>
+            <span style="font-size:12px; color:#4b5563; font-weight:700;">Desplegar ▾</span>
+          </summary>
+          <div style="overflow-x:auto; border-top:1px solid #e5e7eb;">
+            <table class="data-table">
+              <thead><tr><th>Hora</th><th>Tipo</th><th>Producto / Talle</th><th>SKU</th><th>Cambio</th><th>Stock Final</th><th>Motivo</th></tr></thead>
+              <tbody>${rowsHtml}</tbody>
+            </table>
+          </div>
+        </details>
+      `);
+    }
+    wrap.innerHTML = htmlParts.join("");
   }
 
   document.getElementById("stockMovementForm")?.addEventListener("submit", async (e) => {
@@ -1097,6 +1289,34 @@
     renderNewImages();
   }
 
+  async function importProductsFile(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append("file", file);
+    toast("⏳ Importando productos...");
+    try {
+      const res = await fetch("/api/admin/import-products", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!data.ok) {
+        toast(data.error || "Error importando archivo", true);
+        return;
+      }
+      let msg = `✅ ${data.created} producto(s) y ${data.variants} variante(s) importados.`;
+      if (data.errors && data.errors.length) {
+        msg += ` (${data.errors.length} fila(s) omitidas)`;
+        alert(msg + "\n\nObservaciones:\n" + data.errors.join("\n"));
+      } else {
+        toast(msg);
+      }
+      await loadState();
+    } catch {
+      toast("Error de conexión al importar.", true);
+    } finally {
+      input.value = "";
+    }
+  }
+
   document.getElementById("posNewProductForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const payload = {
@@ -1229,8 +1449,8 @@
 
   // ---------------- RECENT SALES & WEB ORDERS ----------------
   function renderRecentSalesTab() {
-    const body = document.getElementById("recentSalesBody");
-    if (!body) return;
+    const wrap = document.getElementById("recentSalesGrouped");
+    if (!wrap) return;
 
     const pendingCount = state.recentSales.filter(
       (o) => o.payment_status === "PENDING" || (o.payment_status === "PAID" && o.shipping_status !== "DELIVERED" && o.shipping_status !== "SHIPPED")
@@ -1247,54 +1467,94 @@
       return true;
     });
 
-    body.innerHTML = filtered.length
-      ? filtered
-          .map((o) => {
-            const ch = o.channel || "WEB";
-            const itemsSummary = (o.items || []).map((i) => `${i.quantity}x ${i.product_name} (${i.variant_label})`).join(" · ");
-            return `<tr>
-              <td><strong>#${o.order_number}</strong></td>
-              <td>
-                <span class="ch-badge ch-${ch}">${ch}</span>
-                <div style="font-size:11px; color:var(--muted); margin-top:3px;">${o.created_at}</div>
-              </td>
-              <td>
-                <strong>${o.customer_name}</strong>
-                <div style="font-size:11.5px; color:var(--muted); max-width:260px;">${itemsSummary}</div>
-              </td>
-              <td>
-                <strong>${fmt(o.total)}</strong>
-                <div style="font-size:11px; color:var(--muted);">${o.payment_method}</div>
-              </td>
-              <td>
-                <select onchange="window.WhipPOS.updateOrderField(${o.id}, 'payment_status', this.value)" style="height:30px; border-radius:7px; border:1px solid #d1d5db; background:#fff; color:#111; font-size:12px; padding:0 6px;">
-                  <option value="PENDING" ${o.payment_status === "PENDING" ? "selected" : ""}>Pendiente</option>
-                  <option value="PAID" ${o.payment_status === "PAID" ? "selected" : ""}>Pagado</option>
-                  <option value="CANCELLED" ${o.payment_status === "CANCELLED" ? "selected" : ""}>Cancelado</option>
+    if (!filtered.length) {
+      wrap.innerHTML = `<div class="card-panel" style="padding:24px; text-align:center; color:#6b7280;">No hay ventas/pedidos para este filtro.</div>`;
+      return;
+    }
+
+    const groups = new Map();
+    for (const o of filtered) {
+      const dateKey = (o.created_at || "Sin fecha").split(" ")[0];
+      if (!groups.has(dateKey)) groups.set(dateKey, []);
+      groups.get(dateKey).push(o);
+    }
+
+    let gIdx = 0;
+    const htmlParts = [];
+    for (const [dateKey, list] of groups.entries()) {
+      const openAttr = gIdx === 0 ? "open" : "";
+      gIdx++;
+      const dayPaidTotal = list.filter((o) => o.payment_status === "PAID").reduce((s, o) => s + (o.total || 0), 0);
+
+      const rowsHtml = list
+        .map((o) => {
+          const ch = o.channel || "WEB";
+          const timePart = (o.created_at || "").split(" ")[1] || "";
+          const itemsSummary = (o.items || []).map((i) => `${i.quantity}x ${i.product_name} (${i.variant_label})`).join(" · ");
+          return `<tr>
+            <td><strong>#${o.order_number}</strong></td>
+            <td>
+              <span class="ch-badge ch-${ch}">${ch}</span>
+              <div style="font-size:11px; color:#6b7280; margin-top:3px;">${timePart || o.created_at}</div>
+            </td>
+            <td>
+              <strong>${o.customer_name}</strong>
+              <div style="font-size:11.5px; color:#6b7280; max-width:260px;">${itemsSummary}</div>
+            </td>
+            <td>
+              <strong>${fmt(o.total)}</strong>
+              <div style="font-size:11px; color:#6b7280;">${o.payment_method}</div>
+              ${o.notes ? `<div style="font-size:10.5px; color:#111; font-family:monospace;">${o.notes}</div>` : ""}
+            </td>
+            <td>
+              <select onchange="window.WhipPOS.updateOrderField(${o.id}, 'payment_status', this.value)" style="height:30px; border-radius:7px; border:1px solid #d1d5db; background:#fff; color:#111; font-size:12px; padding:0 6px;">
+                <option value="PENDING" ${o.payment_status === "PENDING" ? "selected" : ""}>Pendiente</option>
+                <option value="PAID" ${o.payment_status === "PAID" ? "selected" : ""}>Pagado</option>
+                <option value="CANCELLED" ${o.payment_status === "CANCELLED" ? "selected" : ""}>Cancelado</option>
+              </select>
+            </td>
+            <td>
+              <div style="display:flex; flex-direction:column; gap:4px;">
+                <select onchange="window.WhipPOS.updateOrderField(${o.id}, 'shipping_status', this.value)" style="height:28px; border-radius:7px; border:1px solid #d1d5db; background:#fff; color:#111; font-size:11.5px; padding:0 6px;">
+                  <option value="UNFULFILLED" ${o.shipping_status === "UNFULFILLED" ? "selected" : ""}>Sin preparar</option>
+                  <option value="PREPARING" ${o.shipping_status === "PREPARING" ? "selected" : ""}>Preparando</option>
+                  <option value="SHIPPED" ${o.shipping_status === "SHIPPED" ? "selected" : ""}>Enviado</option>
+                  <option value="DELIVERED" ${o.shipping_status === "DELIVERED" ? "selected" : ""}>Entregado</option>
                 </select>
-              </td>
-              <td>
-                <div style="display:flex; flex-direction:column; gap:4px;">
-                  <select onchange="window.WhipPOS.updateOrderField(${o.id}, 'shipping_status', this.value)" style="height:28px; border-radius:7px; border:1px solid #d1d5db; background:#fff; color:#111; font-size:11.5px; padding:0 6px;">
-                    <option value="UNFULFILLED" ${o.shipping_status === "UNFULFILLED" ? "selected" : ""}>Sin preparar</option>
-                    <option value="PREPARING" ${o.shipping_status === "PREPARING" ? "selected" : ""}>Preparando</option>
-                    <option value="SHIPPED" ${o.shipping_status === "SHIPPED" ? "selected" : ""}>Enviado</option>
-                    <option value="DELIVERED" ${o.shipping_status === "DELIVERED" ? "selected" : ""}>Entregado</option>
-                  </select>
-                  ${ch === "WEB" ? `<div style="display:flex; gap:4px;">
-                    <input type="text" id="trk-${o.id}" value="${o.tracking_code || ""}" placeholder="Tracking..." style="width:110px; height:26px; font-size:11px; padding:0 6px; border-radius:6px; border:1px solid #d1d5db; background:#fff; color:#111;">
-                    <button type="button" class="btn btn-outline" style="height:26px; padding:0 6px; font-size:10.5px;" onclick="window.WhipPOS.saveTracking(${o.id})">OK</button>
-                  </div>` : ""}
-                </div>
-              </td>
-              <td style="text-align:right; white-space:nowrap;">
-                <button type="button" class="btn btn-outline" style="height:30px; padding:0 10px; font-size:11.5px;" onclick="window.WhipPOS.reprintOrder(${o.id})">🧾 Ticket</button>
-                ${!o.stock_restored ? `<button type="button" class="btn btn-outline" style="height:30px; padding:0 10px; font-size:11.5px; border-color:#e63946; color:#e63946;" onclick="window.WhipPOS.cancelOrder(${o.id})">Anular</button>` : ""}
-              </td>
-            </tr>`;
-          })
-          .join("")
-      : `<tr><td colspan="7" style="text-align:center; color:var(--muted); padding:24px;">No hay ventas/pedidos para este filtro.</td></tr>`;
+                ${ch === "WEB" ? `<div style="display:flex; gap:4px;">
+                  <input type="text" id="trk-${o.id}" value="${o.tracking_code || ""}" placeholder="Tracking..." style="width:110px; height:26px; font-size:11px; padding:0 6px; border-radius:6px; border:1px solid #d1d5db; background:#fff; color:#111;">
+                  <button type="button" class="btn btn-outline" style="height:26px; padding:0 6px; font-size:10.5px;" onclick="window.WhipPOS.saveTracking(${o.id})">OK</button>
+                </div>` : ""}
+              </div>
+            </td>
+            <td style="text-align:right; white-space:nowrap;">
+              <button type="button" class="btn btn-outline" style="height:30px; padding:0 10px; font-size:11.5px;" onclick="window.WhipPOS.reprintOrder(${o.id})">🧾 Ticket</button>
+              ${!o.stock_restored ? `<button type="button" class="btn btn-outline" style="height:30px; padding:0 10px; font-size:11.5px; border-color:#e63946; color:#e63946;" onclick="window.WhipPOS.cancelOrder(${o.id})">Anular</button>` : ""}
+            </td>
+          </tr>`;
+        })
+        .join("");
+
+      htmlParts.push(`
+        <details class="card-panel" style="padding:0; overflow:hidden; margin-bottom:0;" ${openAttr}>
+          <summary style="padding:13px 18px; background:#f8f9fa; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; cursor:pointer; list-style:none;">
+            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+              <strong style="font-size:14px; color:#111;">📅 ${dateKey}</strong>
+              <span style="font-size:12px; font-weight:700; color:#6b7280;">${list.length} pedido(s)</span>
+              <span style="font-size:12.5px; font-weight:800; color:#00a650;">Pagado: ${fmt(dayPaidTotal)}</span>
+            </div>
+            <span style="font-size:12px; color:#4b5563; font-weight:700;">Desplegar ▾</span>
+          </summary>
+          <div style="overflow-x:auto; border-top:1px solid #e5e7eb;">
+            <table class="data-table">
+              <thead><tr><th>Pedido</th><th>Canal / Hora</th><th>Cliente y Productos</th><th>Total / Pago</th><th>Estado Pago</th><th>Envío / Tracking</th><th style="text-align:right;">Acciones</th></tr></thead>
+              <tbody>${rowsHtml}</tbody>
+            </table>
+          </div>
+        </details>
+      `);
+    }
+    wrap.innerHTML = htmlParts.join("");
   }
 
   async function updateOrderField(orderId, field, value) {
@@ -1373,6 +1633,28 @@
       btn.classList.add("active");
       const chk = document.getElementById("posApplyTransferDiscount");
       if (chk) chk.checked = pm === "EFECTIVO" || pm === "TRANSFERENCIA";
+
+      const refWrap = document.getElementById("posPaymentRefWrap");
+      const refLabel = document.getElementById("posPaymentRefLabel");
+      const refInput = document.getElementById("posPaymentRef");
+      if (refWrap) {
+        if (pm === "EFECTIVO") {
+          refWrap.style.display = "none";
+          if (refInput) refInput.value = "";
+        } else {
+          refWrap.style.display = "block";
+          if (pm === "TRANSFERENCIA") {
+            if (refLabel) refLabel.textContent = "Nro. de transferencia";
+            if (refInput) refInput.placeholder = "Ej: Nro. de operación / transferencia";
+          } else if (pm === "MERCADOPAGO") {
+            if (refLabel) refLabel.textContent = "Nro. de operación Mercado Pago";
+            if (refInput) refInput.placeholder = "Ej: 1234567890";
+          } else {
+            if (refLabel) refLabel.textContent = "Nro. de ticket / cupón tarjeta";
+            if (refInput) refInput.placeholder = "Ej: Cupón / lote posnet";
+          }
+        }
+      }
       renderCart();
     },
     addVariant,
@@ -1390,6 +1672,7 @@
       const o = state.recentSales.find((x) => x.id === orderId);
       if (o) openReceiptModal(o);
     },
+    shareReceiptImage,
     renderStockTab,
     onStockSearch() {
       state.stockPage = 1;
@@ -1418,6 +1701,7 @@
     setCoverImage,
     moveImage,
     removeImage,
+    importProductsFile,
     addEditVariantRow,
     setSalesFilter(f, btn) {
       state.salesFilter = f;

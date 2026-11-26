@@ -8,4 +8,5 @@ instance/
 .env
 .DS_Store
 *.csv
+*.xlsx
 import_csv.py

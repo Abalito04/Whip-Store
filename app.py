@@ -1,10 +1,12 @@
+import csv
 import hmac
+import io
 import os
 import re
 import time
 from datetime import datetime
 from werkzeug.utils import secure_filename
-from flask import Flask, jsonify, redirect, render_template, request, session
+from flask import Flask, jsonify, redirect, render_template, request, send_file, session
 from sqlalchemy import inspect, text
 from models import (
     CashMovement,
@@ -974,6 +976,279 @@ def api_admin_create_product():
     return jsonify({"ok": True, "product": prod.to_dict()})
 
 
+IMPORT_COLUMNS = [
+    "nombre",
+    "marca",
+    "categoria",
+    "subcategoria",
+    "outlet",
+    "color",
+    "precio_lista",
+    "precio_efectivo",
+    "precio_tachado",
+    "stock_s",
+    "stock_m",
+    "stock_l",
+    "stock_xl",
+    "stock_unico",
+    "publicar",
+]
+
+
+def _build_import_template_bytes():
+    import openpyxl
+    from openpyxl.styles import Alignment, Font, PatternFill
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Productos"
+
+    ws.append(IMPORT_COLUMNS)
+    header_fill = PatternFill(start_color="111111", end_color="111111", fill_type="solid")
+    header_font = Font(color="FFFFFF", bold=True, size=11)
+    for col_idx in range(1, len(IMPORT_COLUMNS) + 1):
+        cell = ws.cell(row=1, column=col_idx)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    sample_rows = [
+        ["Casco Fox V1 Matte Black", "Fox", "cascos", "", "no", "Negro Mate", 450000, 380000, "", 1, 2, 2, 1, 0, "no"],
+        ["Conjunto Thor Pulse Air", "Thor", "indumentaria", "competicion", "no", "Negro y Blanco", 240000, 200000, "", 0, 2, 1, 0, 0, "no"],
+        ["Gafas Oakley Sutro", "Oakley", "antiparras", "", "no", "Negro", 110000, 95000, "", 0, 0, 0, 0, 3, "no"],
+    ]
+    for row in sample_rows:
+        ws.append(row)
+
+    widths = [30, 16, 14, 15, 9, 16, 14, 15, 15, 9, 9, 9, 9, 12, 10]
+    for idx, w in enumerate(widths, start=1):
+        col_letter = openpyxl.utils.get_column_letter(idx)
+        ws.column_dimensions[col_letter].width = w
+    ws.freeze_panes = "A2"
+
+    # Hoja de instrucciones
+    ws2 = wb.create_sheet("Instrucciones")
+    ws2.append(["Columna", "Valores permitidos / Explicación"])
+    ws2["A1"].font = Font(bold=True)
+    ws2["B1"].font = Font(bold=True)
+    guide = [
+        ("nombre", "Obligatorio. Nombre del modelo (ej: Casco Fox V1 Matte)."),
+        ("marca", "Obligatorio. Marca (ej: Fox, Bell, Alpinestars, Troy Lee Designs, Thor)."),
+        ("categoria", "Obligatorio. Escribir: cascos, indumentaria o antiparras."),
+        ("subcategoria", "Solo para indumentaria: competicion o casual (dejar vacío en otras categorías)."),
+        ("outlet", "Opcional. Escribir 'si' si es usado/outlet, o 'no' (por defecto 'no')."),
+        ("color", "Opcional. Color principal (ej: Negro Mate, Rojo y Azul)."),
+        ("precio_lista", "Obligatorio. Precio de lista / tarjetas (solo números, ej: 450000)."),
+        ("precio_efectivo", "Opcional. Precio efectivo / transferencia (si vacío, calcula -15%)."),
+        ("precio_tachado", "Opcional. Precio anterior tachado para mostrar % OFF."),
+        ("stock_s / m / l / xl", "Unidades disponibles por talle (0 o vacío si no hay)."),
+        ("stock_unico", "Unidades en talle Único (ideal para gafas/antiparras)."),
+        ("publicar", "Escribir 'no' para cargar Pausado (recomendado hasta subir fotos) o 'si' para publicar directo."),
+    ]
+    for k, v in guide:
+        ws2.append([k, v])
+    ws2.column_dimensions["A"].width = 22
+    ws2.column_dimensions["B"].width = 82
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
+
+
+@app.route("/api/admin/import-template")
+def api_admin_import_template():
+    unauth = require_admin()
+    if unauth:
+        return unauth
+    buf = _build_import_template_bytes()
+    return send_file(
+        buf,
+        as_attachment=True,
+        download_name="plantilla_productos_whip.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+def _clean_int(val, default=0):
+    if val is None or val == "":
+        return default
+    if isinstance(val, (int, float)):
+        return int(round(val))
+    digits = re.sub(r"[^\d]", "", str(val).split(",")[0].split(".")[0] if re.search(r"[.,]\d{1,2}$", str(val).strip()) else str(val))
+    return int(digits) if digits else default
+
+
+def _clean_bool(val, default=False):
+    s = str(val or "").strip().lower()
+    if not s:
+        return default
+    return s in ("si", "sí", "s", "true", "1", "yes", "usado", "outlet")
+
+
+@app.route("/api/admin/import-products", methods=["POST"])
+def api_admin_import_products():
+    unauth = require_admin()
+    if unauth:
+        return unauth
+
+    file = request.files.get("file")
+    if not file or not file.filename:
+        return jsonify({"ok": False, "error": "Seleccioná un archivo .xlsx o .csv."}), 400
+
+    ext = os.path.splitext(file.filename)[1].lower()
+    rows = []
+
+    try:
+        if ext == ".xlsx":
+            import openpyxl
+
+            wb = openpyxl.load_workbook(file, data_only=True)
+            ws = wb.active
+            raw_rows = list(ws.iter_rows(values_only=True))
+            if not raw_rows:
+                return jsonify({"ok": False, "error": "El archivo Excel está vacío."}), 400
+            headers = [re.sub(r"[^a-z0-9_]+", "_", str(h or "").strip().lower()).strip("_") for h in raw_rows[0]]
+            for r in raw_rows[1:]:
+                if not any(cell is not None and str(cell).strip() != "" for cell in r):
+                    continue
+                rows.append({headers[i]: (r[i] if i < len(r) else "") for i in range(len(headers))})
+        elif ext == ".csv":
+            raw_text = file.read().decode("utf-8-sig", errors="replace")
+            sample = raw_text[:2048]
+            delimiter = ";" if sample.count(";") > sample.count(",") else ","
+            reader = csv.DictReader(io.StringIO(raw_text), delimiter=delimiter)
+            for r in reader:
+                norm = {re.sub(r"[^a-z0-9_]+", "_", str(k or "").strip().lower()).strip("_"): v for k, v in r.items()}
+                if any(str(v or "").strip() for v in norm.values()):
+                    rows.append(norm)
+        else:
+            return jsonify({"ok": False, "error": "Formato no soportado. Subí un archivo .xlsx o .csv."}), 400
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"No se pudo leer el archivo: {exc}"}), 400
+
+    if not rows:
+        return jsonify({"ok": False, "error": "No se encontraron filas con productos en el archivo."}), 400
+
+    cat_map = {
+        "casco": "cascos",
+        "cascos": "cascos",
+        "indumentaria": "indumentaria",
+        "ropa": "indumentaria",
+        "antiparra": "antiparras",
+        "antiparras": "antiparras",
+        "gafa": "antiparras",
+        "gafas": "antiparras",
+        "gafas_antiparras": "antiparras",
+    }
+
+    created = 0
+    created_variants = 0
+    errors = []
+    ts_base = int(time.time())
+
+    try:
+        for idx, r in enumerate(rows, start=2):
+            name = str(r.get("nombre") or r.get("nombre_modelo") or "").strip()
+            if not name:
+                errors.append(f"Fila {idx}: falta el nombre.")
+                continue
+
+            brand = str(r.get("marca") or "Whip").strip() or "Whip"
+            cat_raw = re.sub(r"[^a-z]+", "_", str(r.get("categoria") or "cascos").strip().lower()).strip("_")
+            cat_slug = cat_map.get(cat_raw, "cascos")
+            cat = Category.query.filter_by(slug=cat_slug).first() or Category.query.first()
+
+            sub_raw = str(r.get("subcategoria") or "").strip().lower()
+            subcategory = ""
+            if cat_slug == "indumentaria":
+                if "casual" in sub_raw or "informal" in sub_raw:
+                    subcategory = "casual"
+                elif sub_raw:
+                    subcategory = "competicion"
+
+            price = _clean_int(r.get("precio_lista") or r.get("precio"), 0)
+            if price <= 0:
+                errors.append(f"Fila {idx} ({name}): precio_lista inválido.")
+                continue
+
+            cash_price_val = _clean_int(r.get("precio_efectivo"), 0)
+            cash_price = cash_price_val if 0 < cash_price_val < price else None
+            compare_val = _clean_int(r.get("precio_tachado"), 0)
+            compare_at_price = compare_val if compare_val > price else None
+            transfer_discount = (
+                max(1, min(90, round((1 - cash_price / price) * 100)))
+                if cash_price and price > cash_price
+                else 15
+            )
+
+            color = str(r.get("color") or "Único").strip() or "Único"
+            is_outlet = _clean_bool(r.get("outlet"), False)
+            is_active = _clean_bool(r.get("publicar"), False)
+
+            slug_base = re.sub(r"[^a-z0-9]+", "-", f"{brand}-{name}".lower()).strip("-")
+            slug = f"{slug_base}-{str(ts_base)[-4:]}-{idx}"
+            sku_prefix = f"{re.sub(r'[^A-Z0-9]+', '', brand[:3].upper()) or 'WHP'}-{str(ts_base)[-4:]}{idx}"
+
+            default_img = "/static/images/cat-gafas.jpg" if cat_slug == "antiparras" else (
+                "/static/images/cat-indumentaria.jpg" if cat_slug == "indumentaria" else "/static/images/cat-cascos.jpg"
+            )
+
+            prod = Product(
+                name=name,
+                slug=slug,
+                brand=brand,
+                category=cat,
+                subcategory=subcategory,
+                price=price,
+                cash_price=cash_price,
+                compare_at_price=compare_at_price,
+                transfer_discount=transfer_discount,
+                is_active=is_active,
+                is_featured=False,
+                is_outlet=is_outlet,
+                description="",
+                images_json=[default_img],
+                specs_json={"Condición": "Usado" if is_outlet else "Nuevo", "Color": color},
+            )
+            db.session.add(prod)
+            db.session.flush()
+
+            st_s = max(0, _clean_int(r.get("stock_s"), 0))
+            st_m = max(0, _clean_int(r.get("stock_m"), 0))
+            st_l = max(0, _clean_int(r.get("stock_l"), 0))
+            st_xl = max(0, _clean_int(r.get("stock_xl"), 0))
+            st_u = max(0, _clean_int(r.get("stock_unico"), 0))
+
+            if cat_slug == "antiparras" or (st_u > 0 and (st_s + st_m + st_l + st_xl) == 0):
+                sizes_to_create = [("Único", st_u)]
+            else:
+                sizes_to_create = [("S", st_s), ("M", st_m), ("L", st_l), ("XL", st_xl)]
+
+            for size_lbl, st_qty in sizes_to_create:
+                sku_size = "U" if size_lbl == "Único" else size_lbl
+                v = ProductVariant(
+                    product_id=prod.id,
+                    size=size_lbl,
+                    color=color,
+                    sku=f"{sku_prefix}-{sku_size}",
+                    stock=st_qty,
+                )
+                db.session.add(v)
+                db.session.flush()
+                created_variants += 1
+                if st_qty > 0:
+                    record_stock_movement(v, st_qty, "INGRESO", reason="Importación masiva desde Excel")
+
+            created += 1
+
+        db.session.commit()
+        return jsonify({"ok": True, "created": created, "variants": created_variants, "errors": errors})
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({"ok": False, "error": f"Error durante la importación: {exc}"}), 500
+
+
 @app.route("/api/admin/order/<int:order_id>", methods=["PATCH"])
 def api_admin_update_order(order_id):
     unauth = require_admin()
@@ -1012,6 +1287,26 @@ def api_admin_restore_stock(order_id):
 
     _restore_order_stock_if_needed(order, "Anulación Pedido")
     order.payment_status = "CANCELLED"
+
+    # Revertir impacto en la Caja Diaria abierta
+    linked_movs = CashMovement.query.filter_by(order_id=order.id, movement_type="VENTA").all()
+    if linked_movs:
+        open_session = CashSession.query.filter_by(status="OPEN").order_by(CashSession.id.desc()).first()
+        for mov in linked_movs:
+            if open_session and mov.session_id == open_session.id:
+                db.session.delete(mov)
+            elif open_session and mov.payment_method == "EFECTIVO":
+                db.session.add(
+                    CashMovement(
+                        session_id=open_session.id,
+                        order_id=order.id,
+                        movement_type="EGRESO",
+                        payment_method="EFECTIVO",
+                        amount=mov.amount,
+                        description=f"Anulación Venta #{order.order_number} (turno anterior)",
+                    )
+                )
+
     db.session.commit()
     return jsonify({"ok": True, "order": order.to_dict()})
 
@@ -1202,6 +1497,8 @@ def api_pos_create_sale():
         # Registrar ingreso en la caja abierta (si existe una sesión abierta)
         active_session = CashSession.query.filter_by(status="OPEN").order_by(CashSession.id.desc()).first()
         if active_session:
+            pay_ref = (data.get("payment_ref") or "").strip()
+            ref_suffix = f" · Comp: {pay_ref}" if pay_ref else ""
             db.session.add(
                 CashMovement(
                     session_id=active_session.id,
@@ -1209,7 +1506,7 @@ def api_pos_create_sale():
                     movement_type="VENTA",
                     payment_method=payment_method,
                     amount=total,
-                    description=f"Venta #{new_order.order_number} · {customer_name} ({channel})",
+                    description=f"Venta #{new_order.order_number} · {customer_name} ({channel}){ref_suffix}",
                 )
             )
 
