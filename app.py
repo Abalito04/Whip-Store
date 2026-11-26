@@ -122,6 +122,8 @@ def ensure_schema_updates():
             db.session.execute(text("ALTER TABLE orders ADD COLUMN notes VARCHAR(255) DEFAULT ''"))
         if "mp_payment_id" not in existing_cols:
             db.session.execute(text("ALTER TABLE orders ADD COLUMN mp_payment_id VARCHAR(100) DEFAULT ''"))
+        if "stock_deducted" not in existing_cols:
+            db.session.execute(text("ALTER TABLE orders ADD COLUMN stock_deducted BOOLEAN DEFAULT TRUE"))
     if "products" in tables:
         prod_cols = {c["name"] for c in inspector.get_columns("products")}
         if "cash_price" not in prod_cols:
@@ -456,12 +458,15 @@ def api_checkout():
             discount_amount=discount_amount,
             shipping_cost=shipping_cost,
             total=total,
+            # Para Mercado Pago real NO se descuenta stock hasta que MP confirme el pago aprobado
+            stock_deducted=not is_mp_real,
         )
         db.session.add(new_order)
         db.session.flush()
 
         for variant, qty in order_items_to_create:
-            variant.stock -= qty
+            if not is_mp_real:
+                variant.stock -= qty
             db.session.add(
                 OrderItem(
                     order_id=new_order.id,
@@ -473,13 +478,14 @@ def api_checkout():
                     unit_price=variant.product.price,
                 )
             )
-            record_stock_movement(
-                variant,
-                -qty,
-                "VENTA_WEB",
-                reason=f"Pedido Web #{new_order.order_number}",
-                order_id=new_order.id,
-            )
+            if not is_mp_real:
+                record_stock_movement(
+                    variant,
+                    -qty,
+                    "VENTA_WEB",
+                    reason=f"Pedido Web #{new_order.order_number}",
+                    order_id=new_order.id,
+                )
 
         db.session.commit()
 
@@ -541,8 +547,30 @@ def api_checkout():
         return jsonify({"ok": False, "error": f"Error al procesar el pedido: {exc}"}), 500
 
 
+def _deduct_order_stock_if_needed(order, reason_prefix="Pago MP aprobado Pedido"):
+    """Descuenta el stock de un pedido una única vez cuando se confirma el pago."""
+    if not order or order.stock_deducted:
+        return
+    for item in order.items:
+        if item.variant_id:
+            variant = db.session.get(ProductVariant, item.variant_id)
+            if variant:
+                deducted = min(variant.stock, item.quantity)
+                variant.stock = max(0, variant.stock - item.quantity)
+                if deducted > 0:
+                    record_stock_movement(
+                        variant,
+                        -deducted,
+                        "VENTA_WEB",
+                        reason=f"{reason_prefix} #{order.order_number}",
+                        order_id=order.id,
+                    )
+    order.stock_deducted = True
+
+
 def _restore_order_stock_if_needed(order, reason_prefix="Pago cancelado/rechazado"):
-    if not order or order.stock_restored:
+    """Devuelve el stock solo si previamente llegó a descontarse."""
+    if not order or order.stock_restored or not order.stock_deducted:
         return
     for item in order.items:
         if item.variant_id:
@@ -575,6 +603,7 @@ def pago_resultado(status):
                 order.payment_status = "PAID"
                 if order.shipping_status == "UNFULFILLED":
                     order.shipping_status = "PREPARING"
+                _deduct_order_stock_if_needed(order, "Pago MP aprobado Pedido")
             elif status == "fallido" and order.payment_status != "PAID":
                 order.payment_status = "CANCELLED"
                 _restore_order_stock_if_needed(order, "Pago MP fallido Pedido")
@@ -584,7 +613,7 @@ def pago_resultado(status):
 
 @app.route("/api/webhooks/mercadopago", methods=["POST", "GET"])
 def api_webhook_mercadopago():
-    """Webhook oficial de Mercado Pago para confirmar pagos y revertir stock en rechazos."""
+    """Webhook oficial de Mercado Pago para confirmar pagos, descontar stock al aprobar y revertir en rechazos."""
     mp_access_token = os.environ.get("MP_ACCESS_TOKEN", "").strip()
     if not mp_access_token:
         return jsonify({"ok": True, "ignored": True}), 200
@@ -618,6 +647,7 @@ def api_webhook_mercadopago():
                     order.payment_status = "PAID"
                     if order.shipping_status == "UNFULFILLED":
                         order.shipping_status = "PREPARING"
+                    _deduct_order_stock_if_needed(order, "Webhook MP aprobado Pedido")
                 elif mp_status in ("rejected", "cancelled", "refunded", "charged_back"):
                     order.payment_status = "CANCELLED"
                     _restore_order_stock_if_needed(order, f"Webhook MP ({mp_status}) Pedido")
@@ -951,6 +981,8 @@ def api_admin_update_order(order_id):
     data = request.get_json(silent=True) or {}
     if "payment_status" in data:
         order.payment_status = data["payment_status"]
+        if order.payment_status == "PAID":
+            _deduct_order_stock_if_needed(order, "Pago confirmado manualmente Pedido")
     if "shipping_status" in data:
         order.shipping_status = data["shipping_status"]
     if "tracking_code" in data:
@@ -973,21 +1005,8 @@ def api_admin_restore_stock(order_id):
     if order.stock_restored:
         return jsonify({"ok": True, "order": order.to_dict()})
 
-    for item in order.items:
-        if item.variant_id:
-            variant = db.session.get(ProductVariant, item.variant_id)
-            if variant:
-                variant.stock += item.quantity
-                record_stock_movement(
-                    variant,
-                    item.quantity,
-                    "DEVOLUCION",
-                    reason=f"Anulación Pedido #{order.order_number}",
-                    order_id=order.id,
-                )
-
+    _restore_order_stock_if_needed(order, "Anulación Pedido")
     order.payment_status = "CANCELLED"
-    order.stock_restored = True
     db.session.commit()
     return jsonify({"ok": True, "order": order.to_dict()})
 

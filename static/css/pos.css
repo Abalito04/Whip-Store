@@ -533,38 +533,91 @@ body {
 }
 
 @media print {
-  body * {
-    visibility: hidden !important;
+  @page {
+    margin: 4mm;
   }
-  body:not(.printing-barcodes) #receiptPrintArea,
-  body:not(.printing-barcodes) #receiptPrintArea * {
-    visibility: visible !important;
+  html, body {
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    overflow: visible !important;
+  }
+  .pos-header,
+  main,
+  .pos-toast,
+  .modal-backdrop .cart-head,
+  .modal-backdrop button,
+  .modal-backdrop a {
+    display: none !important;
+  }
+
+  body:not(.printing-barcodes) .modal-backdrop:not(#receiptModal) {
+    display: none !important;
+  }
+  body:not(.printing-barcodes) #receiptModal {
+    position: static !important;
+    display: block !important;
+    background: none !important;
+    padding: 0 !important;
+    inset: auto !important;
+  }
+  body:not(.printing-barcodes) #receiptModal .modal-box {
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    max-width: 72mm !important;
+    width: 72mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+  body:not(.printing-barcodes) #receiptModal .modal-box > div {
+    padding: 0 !important;
+    gap: 0 !important;
   }
   body:not(.printing-barcodes) #receiptPrintArea {
-    position: fixed;
-    left: 0;
-    top: 0;
-    width: 80mm;
-    padding: 4mm;
-    background: #fff !important;
-    color: #000 !important;
+    width: 72mm !important;
+    padding: 2mm !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
     border: none !important;
+    border-radius: 0 !important;
     box-shadow: none !important;
+    font-size: 12px !important;
   }
-  body.printing-barcodes #barcodePrintArea,
-  body.printing-barcodes #barcodePrintArea * {
-    visibility: visible !important;
+
+  body.printing-barcodes .modal-backdrop:not(#barcodeModal) {
+    display: none !important;
+  }
+  body.printing-barcodes #barcodeModal {
+    position: static !important;
+    display: block !important;
+    background: none !important;
+    padding: 0 !important;
+    inset: auto !important;
+  }
+  body.printing-barcodes #barcodeModal .modal-box {
+    box-shadow: none !important;
+    border: none !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  body.printing-barcodes #barcodeProductTitle,
+  body.printing-barcodes #barcodeQtyControls,
+  body.printing-barcodes #barcodeModal .modal-box > div > div:not(#barcodePrintArea) {
+    display: none !important;
   }
   body.printing-barcodes #barcodePrintArea {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    background: #fff !important;
+    width: 100% !important;
+    background: #ffffff !important;
     display: grid !important;
     grid-template-columns: repeat(3, 1fr) !important;
-    gap: 6mm !important;
-    padding: 4mm !important;
+    gap: 5mm !important;
+    padding: 2mm !important;
   }
   body.printing-barcodes .barcode-label {
     border: 1px dashed #666 !important;

@@ -137,6 +137,7 @@ class Order(db.Model):
     discount_amount = db.Column(db.Integer, default=0)
     shipping_cost = db.Column(db.Integer, default=0)
     total = db.Column(db.Integer, nullable=False)
+    stock_deducted = db.Column(db.Boolean, default=True)
     stock_restored = db.Column(db.Boolean, default=False)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -165,6 +166,7 @@ class Order(db.Model):
             "discount_amount": self.discount_amount,
             "shipping_cost": self.shipping_cost,
             "total": self.total,
+            "stock_deducted": bool(self.stock_deducted),
             "stock_restored": self.stock_restored,
             "created_at": self.created_at.strftime("%d/%m/%Y %H:%M"),
             "items": [i.to_dict() for i in self.items],
