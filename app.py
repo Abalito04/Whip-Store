@@ -1360,20 +1360,29 @@ def api_admin_create_product():
 
 
 IMPORT_COLUMNS = [
+    "proveedor",
+    "codigo_base",
     "nombre",
     "marca",
     "categoria",
     "subcategoria",
     "outlet",
     "color",
+    "costo_neto",
+    "iva_pct",
+    "costo_compra",
+    "margen_pct",
     "precio_lista",
+    "dto_efectivo_pct",
     "precio_efectivo",
     "precio_tachado",
     "stock_s",
     "stock_m",
     "stock_l",
     "stock_xl",
+    "stock_xxl",
     "stock_unico",
+    "otros_talles",
     "publicar",
 ]
 
@@ -1388,7 +1397,8 @@ def _build_import_template_bytes():
 
     ws.append(IMPORT_COLUMNS)
     header_fill = PatternFill(start_color="111111", end_color="111111", fill_type="solid")
-    header_font = Font(color="FFFFFF", bold=True, size=11)
+    edit_fill = PatternFill(start_color="ECFDF5", end_color="ECFDF5", fill_type="solid")
+    header_font = Font(color="FFFFFF", bold=True, size=10)
     for col_idx in range(1, len(IMPORT_COLUMNS) + 1):
         cell = ws.cell(row=1, column=col_idx)
         cell.fill = header_fill
@@ -1396,42 +1406,62 @@ def _build_import_template_bytes():
         cell.alignment = Alignment(horizontal="center", vertical="center")
 
     sample_rows = [
-        ["Casco Fox V1 Matte Black", "Fox", "cascos", "", "no", "Negro Mate", 450000, 380000, "", 1, 2, 2, 1, 0, "no"],
-        ["Conjunto Thor Pulse Air", "Thor", "indumentaria", "competicion", "no", "Negro y Blanco", 240000, 200000, "", 0, 2, 1, 0, 0, "no"],
-        ["Gafas Oakley Sutro", "Oakley", "antiparras", "", "no", "Negro", 110000, 95000, "", 0, 0, 0, 0, 3, "no"],
+        [
+            "Global Branding", "31369-255", "Casco V1 Solid", "Fox", "cascos", "", "no", "Negro Mate",
+            284900, 21, "=ROUND(I2*(1+J2/100),0)", 80, "=ROUND(K2*(1+L2/100),0)", 15, "=ROUND(M2*(1-N2/100),0)", "",
+            0, 1, 1, 0, 0, 0, "", "no",
+        ],
+        [
+            "Radikal Racing", "1052", "Conjunto Solid Grey Mx", "Radikal", "indumentaria", "competicion", "no", "Gris",
+            94000.5, 0, "=ROUND(I3*(1+J3/100),0)", 122.22, "=ROUND(K3*(1+L3/100),0)", 15, "=ROUND(M3*(1-N3/100),0)", "",
+            0, 0, 0, 0, 0, 0, "32/34:1", "no",
+        ],
+        [
+            "Race In", "5103225-7266", "Gafas Vision 3 Wordmark", "Alpinestars", "antiparras", "", "no", "Blanco Gold Mirror",
+            41651.24, 21, "=ROUND(I4*(1+J4/100),0)", 100, "=ROUND(K4*(1+L4/100),0)", 15, "=ROUND(M4*(1-N4/100),0)", "",
+            0, 0, 0, 0, 0, 1, "", "no",
+        ],
     ]
-    for row in sample_rows:
+    for r_idx, row in enumerate(sample_rows, start=2):
         ws.append(row)
+        for col_idx in (9, 10, 12, 14):
+            ws.cell(row=r_idx, column=col_idx).fill = edit_fill
+        for col_idx in (9, 11, 13, 15, 16):
+            ws.cell(row=r_idx, column=col_idx).number_format = "#,##0"
 
-    widths = [30, 16, 14, 15, 9, 16, 14, 15, 15, 9, 9, 9, 9, 12, 10]
+    widths = [18, 15, 32, 14, 14, 14, 8, 18, 13, 9, 14, 12, 14, 15, 15, 14, 8, 8, 8, 8, 9, 11, 16, 9]
     for idx, w in enumerate(widths, start=1):
         col_letter = openpyxl.utils.get_column_letter(idx)
         ws.column_dimensions[col_letter].width = w
-    ws.freeze_panes = "A2"
+    ws.freeze_panes = "D2"
 
-    # Hoja de instrucciones
     ws2 = wb.create_sheet("Instrucciones")
     ws2.append(["Columna", "Valores permitidos / Explicación"])
     ws2["A1"].font = Font(bold=True)
     ws2["B1"].font = Font(bold=True)
     guide = [
-        ("nombre", "Obligatorio. Nombre del modelo (ej: Casco Fox V1 Matte)."),
-        ("marca", "Obligatorio. Marca (ej: Fox, Bell, Alpinestars, Troy Lee Designs, Thor)."),
+        ("proveedor / codigo_base", "Opcional. Nombre del proveedor y código base del artículo para armar el SKU."),
+        ("nombre", "Obligatorio. Nombre del modelo (ej: Casco Fox V1 Solid)."),
+        ("marca", "Obligatorio. Marca (ej: Alpinestars, Fox, Radikal)."),
         ("categoria", "Obligatorio. Escribir: cascos, indumentaria o antiparras."),
-        ("subcategoria", "Solo para indumentaria: competicion o casual (dejar vacío en otras categorías)."),
-        ("outlet", "Opcional. Escribir 'si' si es usado/outlet, o 'no' (por defecto 'no')."),
-        ("color", "Opcional. Color principal (ej: Negro Mate, Rojo y Azul)."),
-        ("precio_lista", "Obligatorio. Precio de lista / tarjetas (solo números, ej: 450000)."),
-        ("precio_efectivo", "Opcional. Precio efectivo / transferencia (si vacío, calcula -15%)."),
-        ("precio_tachado", "Opcional. Precio anterior tachado para mostrar % OFF."),
-        ("stock_s / m / l / xl", "Unidades disponibles por talle (0 o vacío si no hay)."),
-        ("stock_unico", "Unidades en talle Único (ideal para gafas/antiparras)."),
-        ("publicar", "Escribir 'no' para cargar Pausado (recomendado hasta subir fotos) o 'si' para publicar directo."),
+        ("subcategoria", "Solo para indumentaria: competicion o casual."),
+        ("outlet", "Opcional. 'si' si es usado/outlet, o 'no' (por defecto 'no')."),
+        ("color", "Color principal del artículo (ej: Negro, Blanco, Azul Marino)."),
+        ("costo_neto / iva_pct", "Costo unitario de factura y % de IVA (21 si es Factura A/+imp, 0 si ya es costo final)."),
+        ("costo_compra", "Calculado automático: Costo Neto + IVA."),
+        ("margen_pct", "MODIFICABLE (celda verde): % de ganancia a sumar sobre costo_compra (ej: 100 duplica el costo)."),
+        ("precio_lista", "Calculado automático (o podés escribir un número fijo encima): Precio Lista / 6 cuotas."),
+        ("dto_efectivo_pct", "MODIFICABLE (celda verde): % de descuento para Efectivo / Transferencia (por defecto 15)."),
+        ("precio_efectivo", "Calculado automático: Precio contado / transferencia."),
+        ("stock_s / m / l / xl / xxl", "Unidades disponibles por talle estándar."),
+        ("stock_unico", "Unidades en talle Único (gorras OS, gafas, antiparras, accesorios)."),
+        ("otros_talles", "Para talles numéricos o especiales, formato talle:cantidad separados por coma (ej: 32/34:1, 36/38:1 o L/XL:1 o S/M:1)."),
+        ("publicar", "'no' para cargar Pausado hasta subir fotos (recomendado) o 'si' para publicar directo."),
     ]
     for k, v in guide:
         ws2.append([k, v])
-    ws2.column_dimensions["A"].width = 22
-    ws2.column_dimensions["B"].width = 82
+    ws2.column_dimensions["A"].width = 26
+    ws2.column_dimensions["B"].width = 92
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -1453,13 +1483,36 @@ def api_admin_import_template():
     )
 
 
-def _clean_int(val, default=0):
+def _clean_float(val, default=0.0):
     if val is None or val == "":
         return default
     if isinstance(val, (int, float)):
-        return int(round(val))
-    digits = re.sub(r"[^\d]", "", str(val).split(",")[0].split(".")[0] if re.search(r"[.,]\d{1,2}$", str(val).strip()) else str(val))
-    return int(digits) if digits else default
+        return float(val)
+    s = str(val).strip()
+    if not s or s.startswith("="):
+        return default
+    s = re.sub(r"[^\d.,-]", "", s)
+    if "," in s and "." in s:
+        if s.rfind(",") > s.rfind("."):
+            s = s.replace(".", "").replace(",", ".")
+        else:
+            s = s.replace(",", "")
+    elif "," in s:
+        if re.search(r",\d{1,2}$", s):
+            s = s.replace(",", ".")
+        else:
+            s = s.replace(",", "")
+    try:
+        return float(s)
+    except ValueError:
+        return default
+
+
+def _clean_int(val, default=0):
+    f = _clean_float(val, None)
+    if f is None:
+        return default
+    return int(round(f))
 
 
 def _clean_bool(val, default=False):
@@ -1467,6 +1520,39 @@ def _clean_bool(val, default=False):
     if not s:
         return default
     return s in ("si", "sí", "s", "true", "1", "yes", "usado", "outlet")
+
+
+def _parse_otros_talles(raw_val):
+    """Parsea cadenas tipo '32/34:1, 36/38:2' o 'L/XL:1' en lista de tuplas [(talle, stock)]."""
+    s = str(raw_val or "").strip()
+    if not s:
+        return []
+    out = []
+    for part in re.split(r"[,;]+", s):
+        part = part.strip()
+        if not part:
+            continue
+        if ":" in part:
+            sz, q_str = part.split(":", 1)
+            sz = sz.strip()
+            qty = max(0, _clean_int(q_str.strip(), 0))
+        else:
+            sz = part
+            qty = 1
+        if sz:
+            out.append((sz[:20], qty))
+    return out
+
+
+def _unique_sku(candidate_sku, used_skus):
+    base = re.sub(r"[^A-Z0-9/-]+", "", candidate_sku.upper())[:72] or "WHIP-SKU"
+    sku = base
+    counter = 2
+    while sku in used_skus or ProductVariant.query.filter_by(sku=sku).first() is not None:
+        sku = f"{base[:68]}-{counter}"
+        counter += 1
+    used_skus.add(sku)
+    return sku
 
 
 @app.route("/api/admin/import-products", methods=["POST"])
@@ -1491,8 +1577,14 @@ def api_admin_import_products():
             raw_rows = list(ws.iter_rows(values_only=True))
             if not raw_rows:
                 return jsonify({"ok": False, "error": "El archivo Excel está vacío."}), 400
-            headers = [re.sub(r"[^a-z0-9_]+", "_", str(h or "").strip().lower()).strip("_") for h in raw_rows[0]]
-            for r in raw_rows[1:]:
+            header_idx = 0
+            for i, cand in enumerate(raw_rows[:10]):
+                norm_cand = [re.sub(r"[^a-z0-9_]+", "_", str(h or "").strip().lower()).strip("_") for h in cand]
+                if "nombre" in norm_cand or "nombre_modelo" in norm_cand:
+                    header_idx = i
+                    break
+            headers = [re.sub(r"[^a-z0-9_]+", "_", str(h or "").strip().lower()).strip("_") for h in raw_rows[header_idx]]
+            for r in raw_rows[header_idx + 1 :]:
                 if not any(cell is not None and str(cell).strip() != "" for cell in r):
                     continue
                 rows.append({headers[i]: (r[i] if i < len(r) else "") for i in range(len(headers))})
@@ -1529,12 +1621,12 @@ def api_admin_import_products():
     created_variants = 0
     errors = []
     ts_base = int(time.time())
+    used_skus = set()
 
     try:
         for idx, r in enumerate(rows, start=2):
             name = str(r.get("nombre") or r.get("nombre_modelo") or "").strip()
-            if not name:
-                errors.append(f"Fila {idx}: falta el nombre.")
+            if not name or name.upper() == "TOTAL":
                 continue
 
             brand = str(r.get("marca") or "Whip").strip() or "Whip"
@@ -1550,12 +1642,27 @@ def api_admin_import_products():
                 elif sub_raw:
                     subcategory = "competicion"
 
+            # Cálculo de precio: usa precio_lista directo (o calculado desde costo + margen si la fórmula no estaba cacheada)
             price = _clean_int(r.get("precio_lista") or r.get("precio"), 0)
+            costo_neto = _clean_float(r.get("costo_neto"), 0.0)
+            iva_pct = _clean_float(r.get("iva_pct"), 0.0)
+            costo_compra = _clean_float(r.get("costo_compra"), 0.0)
+            if costo_compra <= 0 and costo_neto > 0:
+                costo_compra = costo_neto * (1.0 + iva_pct / 100.0)
+            margen_pct = _clean_float(r.get("margen_pct"), 0.0)
+
+            if price <= 0 and costo_compra > 0:
+                price = int(round(costo_compra * (1.0 + margen_pct / 100.0)))
+
             if price <= 0:
                 errors.append(f"Fila {idx} ({name}): precio_lista inválido.")
                 continue
 
+            dto_ef_pct = _clean_float(r.get("dto_efectivo_pct"), 15.0)
             cash_price_val = _clean_int(r.get("precio_efectivo"), 0)
+            if cash_price_val <= 0 and 0 < dto_ef_pct < 95:
+                cash_price_val = int(round(price * (1.0 - dto_ef_pct / 100.0)))
+
             cash_price = cash_price_val if 0 < cash_price_val < price else None
             compare_val = _clean_int(r.get("precio_tachado"), 0)
             compare_at_price = compare_val if compare_val > price else None
@@ -1569,18 +1676,25 @@ def api_admin_import_products():
             is_outlet = _clean_bool(r.get("outlet"), False)
             is_active = _clean_bool(r.get("publicar"), False)
 
-            slug_base = re.sub(r"[^a-z0-9]+", "-", f"{brand}-{name}".lower()).strip("-")
+            slug_base = re.sub(r"[^a-z0-9]+", "-", f"{brand}-{name}-{color}".lower()).strip("-")[:135]
             slug = f"{slug_base}-{str(ts_base)[-4:]}-{idx}"
-            sku_prefix = f"{re.sub(r'[^A-Z0-9]+', '', brand[:3].upper()) or 'WHP'}-{str(ts_base)[-4:]}{idx}"
+
+            cod_base = re.sub(r"[^A-Z0-9-]+", "", str(r.get("codigo_base") or "").strip().upper())
+            brand_code = re.sub(r"[^A-Z0-9]+", "", brand[:3].upper()) or "WHP"
+            sku_prefix = f"{brand_code}-{cod_base}" if cod_base else f"{brand_code}-{str(ts_base)[-4:]}{idx}"
 
             default_img = "/static/images/cat-gafas.jpg" if cat_slug == "antiparras" else (
                 "/static/images/cat-indumentaria.jpg" if cat_slug == "indumentaria" else "/static/images/cat-cascos.jpg"
             )
 
+            specs = {"Condición": "Usado" if is_outlet else "Nuevo", "Color": color}
+            if subcategory:
+                specs["Línea"] = "Casual / Informal" if subcategory == "casual" else "Competición / MX"
+
             prod = Product(
-                name=name,
-                slug=slug,
-                brand=brand,
+                name=name[:150],
+                slug=slug[:160],
+                brand=brand[:80],
                 category=cat,
                 subcategory=subcategory,
                 price=price,
@@ -1592,7 +1706,7 @@ def api_admin_import_products():
                 is_outlet=is_outlet,
                 description="",
                 images_json=[default_img],
-                specs_json={"Condición": "Usado" if is_outlet else "Nuevo", "Color": color},
+                specs_json=specs,
             )
             db.session.add(prod)
             db.session.flush()
@@ -1601,20 +1715,32 @@ def api_admin_import_products():
             st_m = max(0, _clean_int(r.get("stock_m"), 0))
             st_l = max(0, _clean_int(r.get("stock_l"), 0))
             st_xl = max(0, _clean_int(r.get("stock_xl"), 0))
+            st_xxl = max(0, _clean_int(r.get("stock_xxl"), 0))
             st_u = max(0, _clean_int(r.get("stock_unico"), 0))
+            extra_sizes = _parse_otros_talles(r.get("otros_talles"))
 
-            if cat_slug == "antiparras" or (st_u > 0 and (st_s + st_m + st_l + st_xl) == 0):
+            std_sum = st_s + st_m + st_l + st_xl + st_xxl
+            if extra_sizes and std_sum == 0 and st_u == 0:
+                sizes_to_create = extra_sizes
+            elif cat_slug == "antiparras" or (st_u > 0 and std_sum == 0 and not extra_sizes):
                 sizes_to_create = [("Único", st_u)]
             else:
                 sizes_to_create = [("S", st_s), ("M", st_m), ("L", st_l), ("XL", st_xl)]
+                if st_xxl > 0:
+                    sizes_to_create.append(("XXL", st_xxl))
+                if st_u > 0:
+                    sizes_to_create.append(("Único", st_u))
+                sizes_to_create.extend(extra_sizes)
 
             for size_lbl, st_qty in sizes_to_create:
-                sku_size = "U" if size_lbl == "Único" else size_lbl
+                sku_size = "U" if size_lbl == "Único" else re.sub(r"[^A-Z0-9]+", "", size_lbl.upper())
+                cand_sku = f"{sku_prefix}-{sku_size}"
+                final_sku = _unique_sku(cand_sku, used_skus)
                 v = ProductVariant(
                     product_id=prod.id,
                     size=size_lbl,
-                    color=color,
-                    sku=f"{sku_prefix}-{sku_size}",
+                    color=color[:60],
+                    sku=final_sku,
                     stock=st_qty,
                 )
                 db.session.add(v)
