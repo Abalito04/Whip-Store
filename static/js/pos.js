@@ -1529,7 +1529,7 @@
             </td>
             <td style="text-align:right; white-space:nowrap;">
               <button type="button" class="btn btn-outline" style="height:30px; padding:0 10px; font-size:11.5px;" onclick="window.WhipPOS.reprintOrder(${o.id})">🧾 Ticket</button>
-              ${!o.stock_restored ? `<button type="button" class="btn btn-outline" style="height:30px; padding:0 10px; font-size:11.5px; border-color:#e63946; color:#e63946;" onclick="window.WhipPOS.cancelOrder(${o.id})">Anular</button>` : ""}
+              ${o.payment_status !== "CANCELLED" ? `<button type="button" class="btn btn-outline" style="height:30px; padding:0 10px; font-size:11.5px; border-color:#e63946; color:#e63946;" onclick="window.WhipPOS.cancelOrder(${o.id})">Anular</button>` : `<span style="font-size:11.5px; font-weight:700; color:#e63946; margin-left:6px;">Anulado</span>`}
             </td>
           </tr>`;
         })
