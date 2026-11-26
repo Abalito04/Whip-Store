@@ -393,19 +393,26 @@ def api_checkout():
     if not items_req:
         return jsonify({"ok": False, "error": "Tu carrito está vacío."}), 400
 
+    shipping_option = str(data.get("shipping_option") or "").strip().upper()
+    if not shipping_option:
+        return jsonify({"ok": False, "error": "Elegí si querés envío o retiro en sucursal."}), 400
+
+    is_pickup = shipping_option == "RETIRO_LOCAL"
     required_fields = [
         "customer_name",
         "customer_email",
         "customer_phone",
-        "shipping_address",
-        "postal_code",
-        "city",
-        "province",
         "payment_method",
     ]
+    if not is_pickup:
+        required_fields.extend(["shipping_address", "postal_code", "city", "province"])
+
     for field in required_fields:
         if not str(data.get(field, "")).strip():
             return jsonify({"ok": False, "error": "Completá todos los campos obligatorios."}), 400
+
+    if str(data.get("payment_method", "")).strip() not in ("TRANSFERENCIA", "MERCADOPAGO"):
+        return jsonify({"ok": False, "error": "Seleccioná un medio de pago válido."}), 400
 
     # Validación y descuento atómico de stock en la base de datos
     try:
@@ -443,13 +450,23 @@ def api_checkout():
             )
         else:
             discount_amount = 0
-        shipping_option = str(data.get("shipping_option") or "CA_DOMICILIO").strip().upper()
-        quote = calculate_correo_argentino_quotes(data.get("postal_code"))
-        if quote:
-            opt_match = next((o for o in quote["options"] if o["code"] == shipping_option), None)
-            shipping_cost = opt_match["price"] if opt_match else quote["options"][1]["price"]
+        if is_pickup:
+            shipping_cost = 0
+            ship_addr = "Retiro en sucursal (Santa Rosa, La Pampa)"
+            ship_cp = "6300"
+            ship_city = "Santa Rosa"
+            ship_prov = "La Pampa"
         else:
-            shipping_cost = 0 if shipping_option == "RETIRO_LOCAL" else 13800
+            quote = calculate_correo_argentino_quotes(data.get("postal_code"))
+            if quote:
+                opt_match = next((o for o in quote["options"] if o["code"] == shipping_option), None)
+                shipping_cost = opt_match["price"] if opt_match else quote["options"][1]["price"]
+            else:
+                shipping_cost = 13800
+            ship_addr = data["shipping_address"].strip()
+            ship_cp = data["postal_code"].strip()
+            ship_city = data["city"].strip()
+            ship_prov = data["province"].strip()
         total = max(0, subtotal - discount_amount + shipping_cost)
 
         last_order = Order.query.order_by(Order.order_number.desc()).first()
@@ -463,10 +480,10 @@ def api_checkout():
             customer_name=data["customer_name"].strip(),
             customer_email=data["customer_email"].strip(),
             customer_phone=data["customer_phone"].strip(),
-            shipping_address=data["shipping_address"].strip(),
-            postal_code=data["postal_code"].strip(),
-            city=data["city"].strip(),
-            province=data["province"].strip(),
+            shipping_address=ship_addr,
+            postal_code=ship_cp,
+            city=ship_city,
+            province=ship_prov,
             payment_method=payment_method,
             payment_status="PENDING",
             shipping_status="UNFULFILLED",

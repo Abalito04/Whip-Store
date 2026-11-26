@@ -35,46 +35,71 @@
         </div>
 
         <div class="card-panel">
-          <h2 style="margin:0 0 16px; font-size:16px; font-weight:800;">2. Datos de envío</h2>
-          <div class="form-grid">
-            <div class="field form-full">
-              <label>Calle, altura y piso/depto *</label>
-              <input type="text" id="coAddress" required placeholder="Av. San Martín 450">
+          <h2 style="margin:0 0 14px; font-size:16px; font-weight:800;">2. Entrega</h2>
+
+          <label class="pay-option" id="optDeliveryPickup">
+            <input type="radio" name="deliveryMode" value="RETIRO_LOCAL">
+            <div style="flex:1;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <strong style="font-size:14px;">📍 Retiro en sucursal</strong>
+                <span class="badge badge-free">Sin cargo</span>
+              </div>
+              <p style="margin:4px 0 0; font-size:12px; color:#6b7280;">Retirás por nuestro local en Santa Rosa, La Pampa. Te avisamos por WhatsApp cuando esté listo.</p>
             </div>
-            <div class="field">
-              <label>Código Postal *</label>
-              <div style="display:flex; gap:6px;">
-                <input type="text" id="coCp" required placeholder="6300" maxlength="8">
-                <button type="button" id="coQuoteBtn" class="btn btn-dark" style="height:42px; padding:0 12px; font-size:12px; white-space:nowrap;">Cotizar</button>
+          </label>
+
+          <label class="pay-option" id="optDeliveryShip">
+            <input type="radio" name="deliveryMode" value="ENVIO">
+            <div style="flex:1;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <strong style="font-size:14px;">🚚 Envío por Correo Argentino</strong>
+                <span style="font-size:11.5px; font-weight:700; color:#4b5563;">A todo el país</span>
+              </div>
+              <p style="margin:4px 0 0; font-size:12px; color:#6b7280;">Completá tu dirección y código postal para cotizar el envío a sucursal o domicilio.</p>
+            </div>
+          </label>
+
+          <div id="coShippingFieldsWrap" style="display:none; margin-top:16px; padding-top:16px; border-top:1px solid #e5e7eb;">
+            <div class="form-grid">
+              <div class="field form-full">
+                <label>Calle, altura y piso/depto *</label>
+                <input type="text" id="coAddress" placeholder="Av. San Martín 450">
+              </div>
+              <div class="field">
+                <label>Código Postal *</label>
+                <div style="display:flex; gap:6px;">
+                  <input type="text" id="coCp" placeholder="6300" maxlength="8">
+                  <button type="button" id="coQuoteBtn" class="btn btn-dark" style="height:42px; padding:0 12px; font-size:12px; white-space:nowrap;">Cotizar</button>
+                </div>
+              </div>
+              <div class="field">
+                <label>Ciudad / Localidad *</label>
+                <input type="text" id="coCity" placeholder="Santa Rosa">
+              </div>
+              <div class="field form-full">
+                <label>Provincia *</label>
+                <select id="coProvince">
+                  <option>La Pampa</option>
+                  <option>Buenos Aires</option>
+                  <option>CABA</option>
+                  <option>Córdoba</option>
+                  <option>Santa Fe</option>
+                  <option>Mendoza</option>
+                  <option>Neuquén</option>
+                  <option>Río Negro</option>
+                  <option>Tucumán</option>
+                  <option>Salta</option>
+                  <option>Entre Ríos</option>
+                  <option>Otra provincia</option>
+                </select>
               </div>
             </div>
-            <div class="field">
-              <label>Ciudad / Localidad *</label>
-              <input type="text" id="coCity" required placeholder="Santa Rosa">
-            </div>
-            <div class="field form-full">
-              <label>Provincia *</label>
-              <select id="coProvince">
-                <option>La Pampa</option>
-                <option>Buenos Aires</option>
-                <option>CABA</option>
-                <option>Córdoba</option>
-                <option>Santa Fe</option>
-                <option>Mendoza</option>
-                <option>Neuquén</option>
-                <option>Río Negro</option>
-                <option>Tucumán</option>
-                <option>Salta</option>
-                <option>Entre Ríos</option>
-                <option>Otra provincia</option>
-              </select>
-            </div>
-          </div>
 
-          <div id="coShippingOptionsWrap" style="margin-top:16px; padding-top:14px; border-top:1px solid #e5e7eb;">
-            <div style="font-size:12.5px; font-weight:800; margin-bottom:8px;">🚚 Opción de envío (Correo Argentino)</div>
-            <div id="coShippingOptionsList" style="font-size:12.5px; color:#6b7280;">
-              Ingresá tu Código Postal y tocá <strong>Cotizar</strong> para ver el costo exacto de Correo Argentino.
+            <div id="coShippingOptionsWrap" style="margin-top:16px; padding-top:14px; border-top:1px solid #e5e7eb;">
+              <div style="font-size:12.5px; font-weight:800; margin-bottom:8px;">🚚 Opción de envío (Correo Argentino)</div>
+              <div id="coShippingOptionsList" style="font-size:12.5px; color:#6b7280;">
+                Ingresá tu Código Postal y tocá <strong>Cotizar</strong> para ver el costo exacto de Correo Argentino.
+              </div>
             </div>
           </div>
         </div>
@@ -82,8 +107,8 @@
         <div class="card-panel">
           <h2 style="margin:0 0 14px; font-size:16px; font-weight:800;">3. Medio de pago</h2>
 
-          <label class="pay-option selected" id="optTransfer">
-            <input type="radio" name="payMethod" value="TRANSFERENCIA" checked>
+          <label class="pay-option" id="optTransfer">
+            <input type="radio" name="payMethod" value="TRANSFERENCIA">
             <div style="flex:1;">
               <div style="display:flex; justify-content:space-between; align-items:center;">
                 <strong style="font-size:14px;">🏦 Transferencia Bancaria</strong>
@@ -121,8 +146,8 @@
             <span id="coDiscount">- $ 0</span>
           </div>
           <div style="display:flex; justify-content:space-between;">
-            <span style="color:#6b7280;">Envío (Correo Argentino)</span>
-            <strong id="coShipping">A cotizar</strong>
+            <span style="color:#6b7280;" id="coShippingLabel">Entrega</span>
+            <strong id="coShipping">A elegir</strong>
           </div>
           <div style="display:flex; justify-content:space-between; align-items:baseline; padding-top:10px; border-top:1px solid #e5e7eb;">
             <strong style="font-size:16px;">Total</strong>
@@ -131,7 +156,7 @@
         </div>
 
         <button type="submit" id="coSubmitBtn" class="btn btn-cta" style="width:100%; height:50px; margin-top:18px;">
-          CONFIRMAR PEDIDO POR TRANSFERENCIA
+          FINALIZAR COMPRA
         </button>
       </div>
     </form>
@@ -145,11 +170,45 @@
 {% block scripts %}
 <script>
   (function () {
-    let paymentMethod = "TRANSFERENCIA";
-    let shippingOption = "CA_DOMICILIO";
+    let deliveryMode = "";
+    let paymentMethod = "";
+    let shippingOption = "";
     let shippingCost = null;
 
+    const shipFieldsWrap = document.getElementById("coShippingFieldsWrap");
+    const addrInput = document.getElementById("coAddress");
+    const cpInput = document.getElementById("coCp");
+    const cityInput = document.getElementById("coCity");
+
+    document.querySelectorAll('input[name="deliveryMode"]').forEach((radio) => {
+      radio.addEventListener("change", () => {
+        deliveryMode = radio.value;
+        document.getElementById("optDeliveryPickup")?.classList.toggle("selected", deliveryMode === "RETIRO_LOCAL");
+        document.getElementById("optDeliveryShip")?.classList.toggle("selected", deliveryMode === "ENVIO");
+
+        if (deliveryMode === "RETIRO_LOCAL") {
+          if (shipFieldsWrap) shipFieldsWrap.style.display = "none";
+          if (addrInput) addrInput.required = false;
+          if (cpInput) cpInput.required = false;
+          if (cityInput) cityInput.required = false;
+          shippingOption = "RETIRO_LOCAL";
+          shippingCost = 0;
+        } else {
+          if (shipFieldsWrap) shipFieldsWrap.style.display = "block";
+          if (addrInput) addrInput.required = true;
+          if (cpInput) cpInput.required = true;
+          if (cityInput) cityInput.required = true;
+          shippingOption = "CA_DOMICILIO";
+          shippingCost = null;
+          const cp = (cpInput?.value || "").replace(/\D/g, "");
+          if (cp.length >= 4) quoteShipping();
+        }
+        renderSummary();
+      });
+    });
+
     async function quoteShipping() {
+      if (deliveryMode !== "ENVIO") return;
       const cp = (document.getElementById("coCp")?.value || "").replace(/\D/g, "");
       const listEl = document.getElementById("coShippingOptionsList");
       if (!listEl) return;
@@ -165,13 +224,15 @@
           listEl.innerHTML = `<span style="color:#e63946; font-weight:700;">${data.error}</span>`;
           return;
         }
-        const match = data.options.find((o) => o.code === shippingOption) || data.options[0];
+        const shipOnly = (data.options || []).filter((o) => o.code !== "RETIRO_LOCAL");
+        const match = shipOnly.find((o) => o.code === shippingOption) || shipOnly[0];
+        if (!match) return;
         shippingOption = match.code;
         shippingCost = match.price;
 
         listEl.innerHTML =
           `<div style="font-size:11.5px; color:#6b7280; margin-bottom:8px;">Zona: <strong>${data.zone}</strong></div>` +
-          data.options
+          shipOnly
             .map(
               (o) => `
             <label class="pay-option ${o.code === shippingOption ? "selected" : ""}" style="padding:10px 12px; margin-bottom:6px;">
@@ -181,7 +242,7 @@
                   <strong style="font-size:12.5px; color:#111;">${o.name}</strong>
                   <div style="font-size:11px; color:#6b7280;">${o.eta}</div>
                 </div>
-                <strong style="font-size:13px; color:${o.price === 0 ? "#00A650" : "#111"};">${o.price === 0 ? "Sin cargo" : window.WhipStore.formatARS(o.price)}</strong>
+                <strong style="font-size:13px; color:#111;">${window.WhipStore.formatARS(o.price)}</strong>
               </div>
             </label>
           `
@@ -207,7 +268,7 @@
     document.getElementById("coQuoteBtn")?.addEventListener("click", quoteShipping);
     document.getElementById("coCp")?.addEventListener("blur", () => {
       const cp = (document.getElementById("coCp")?.value || "").replace(/\D/g, "");
-      if (cp.length >= 4) quoteShipping();
+      if (deliveryMode === "ENVIO" && cp.length >= 4) quoteShipping();
     });
 
     function renderSummary() {
@@ -248,19 +309,32 @@
       document.getElementById("coSubtotal").textContent = window.WhipStore.formatARS(subtotal);
       document.getElementById("coDiscountRow").style.display = discount > 0 ? "flex" : "none";
       document.getElementById("coDiscount").textContent = "- " + window.WhipStore.formatARS(discount);
+      const shipLabel = document.getElementById("coShippingLabel");
       const shipEl = document.getElementById("coShipping");
-      if (shippingCost === null) {
+      if (!deliveryMode) {
+        if (shipLabel) shipLabel.textContent = "Entrega";
+        shipEl.textContent = "Elegí retiro o envío";
+        shipEl.style.color = "#6b7280";
+      } else if (deliveryMode === "RETIRO_LOCAL") {
+        if (shipLabel) shipLabel.textContent = "Retiro en sucursal";
+        shipEl.textContent = "Sin cargo ($ 0)";
+        shipEl.style.color = "#00A650";
+      } else if (shippingCost === null) {
+        if (shipLabel) shipLabel.textContent = "Envío (Correo Argentino)";
         shipEl.textContent = "Ingresá tu CP";
         shipEl.style.color = "#6b7280";
       } else {
-        shipEl.textContent = shipping === 0 ? "Retiro en local ($ 0)" : window.WhipStore.formatARS(shipping);
-        shipEl.style.color = shipping === 0 ? "#00A650" : "#111";
+        if (shipLabel) shipLabel.textContent = "Envío (Correo Argentino)";
+        shipEl.textContent = window.WhipStore.formatARS(shipping);
+        shipEl.style.color = "#111";
       }
       document.getElementById("coTotal").textContent = window.WhipStore.formatARS(total);
       document.getElementById("coSubmitBtn").textContent =
         paymentMethod === "TRANSFERENCIA"
           ? "CONFIRMAR PEDIDO POR TRANSFERENCIA"
-          : "PAGAR CON MERCADO PAGO";
+          : paymentMethod === "MERCADOPAGO"
+          ? "PAGAR CON MERCADO PAGO"
+          : "FINALIZAR COMPRA";
     }
 
     document.querySelectorAll('input[name="payMethod"]').forEach((radio) => {
@@ -277,15 +351,29 @@
       const errBox = document.getElementById("checkoutError");
       errBox.style.display = "none";
 
+      if (!deliveryMode) {
+        errBox.textContent = "Elegí si preferís retiro en sucursal o envío por Correo Argentino.";
+        errBox.style.display = "block";
+        errBox.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+
+      if (!paymentMethod) {
+        errBox.textContent = "Seleccioná un medio de pago para continuar.";
+        errBox.style.display = "block";
+        errBox.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+
       const cart = window.WhipStore.getCart();
       const payload = {
         customer_name: document.getElementById("coName").value,
         customer_email: document.getElementById("coEmail").value,
         customer_phone: document.getElementById("coPhone").value,
-        shipping_address: document.getElementById("coAddress").value,
-        postal_code: document.getElementById("coCp").value,
-        city: document.getElementById("coCity").value,
-        province: document.getElementById("coProvince").value,
+        shipping_address: deliveryMode === "ENVIO" ? document.getElementById("coAddress").value : "",
+        postal_code: deliveryMode === "ENVIO" ? document.getElementById("coCp").value : "6300",
+        city: deliveryMode === "ENVIO" ? document.getElementById("coCity").value : "Santa Rosa",
+        province: deliveryMode === "ENVIO" ? document.getElementById("coProvince").value : "La Pampa",
         shipping_option: shippingOption,
         payment_method: paymentMethod,
         items: cart.map((i) => ({ variant_id: i.variant_id, quantity: i.quantity })),
