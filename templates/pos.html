@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=5">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/pos.css') }}?v=4">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/pos.css') }}?v=5">
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 </head>
 <body>
@@ -88,7 +88,41 @@
             </button>
           </div>
 
-          <div class="pos-brand-pills" id="posBrandPills"></div>
+          <div class="pos-cat-grid" id="posCategoryCards">
+            <button type="button" class="pos-cat-card active" data-cat="todas" onclick="window.WhipPOS.setPosCategory('todas', this)">
+              <strong>Todos</strong>
+              <span id="posCatCountTodas">0</span>
+            </button>
+            <button type="button" class="pos-cat-card" data-cat="cascos" onclick="window.WhipPOS.setPosCategory('cascos', this)">
+              <strong>🏍️ Cascos</strong>
+              <span id="posCatCountCascos">0</span>
+            </button>
+            <button type="button" class="pos-cat-card" data-cat="indumentaria" onclick="window.WhipPOS.setPosCategory('indumentaria', this)">
+              <strong>👕 Indumentaria</strong>
+              <span id="posCatCountIndumentaria">0</span>
+            </button>
+            <button type="button" class="pos-cat-card" data-cat="antiparras" onclick="window.WhipPOS.setPosCategory('antiparras', this)">
+              <strong>🥽 Gafas / Antip.</strong>
+              <span id="posCatCountAntiparras">0</span>
+            </button>
+            <button type="button" class="pos-cat-card outlet" data-cat="outlet" onclick="window.WhipPOS.setPosCategory('outlet', this)">
+              <strong>🏷️ Outlet</strong>
+              <span id="posCatCountOutlet">0</span>
+            </button>
+          </div>
+
+          <div id="posBrandDrawer" style="display:none; margin-bottom:12px; padding:10px 12px; background:#ffffff; border:1px solid #e5e7eb; border-radius:10px;">
+            <div id="posSubcatWrap" style="display:none; margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #e5e7eb;">
+              <div style="font-size:10.5px; font-weight:800; color:#6b7280; text-transform:uppercase; margin-bottom:5px;">Subcategoría</div>
+              <div class="pos-brand-pills" id="posSubcatPills" style="margin-bottom:0;">
+                <button type="button" class="pill-btn active" data-sub="" onclick="window.WhipPOS.setPosSubcat('', this)">Todas</button>
+                <button type="button" class="pill-btn" data-sub="casual" onclick="window.WhipPOS.setPosSubcat('casual', this)">Casual / Informal</button>
+                <button type="button" class="pill-btn" data-sub="competicion" onclick="window.WhipPOS.setPosSubcat('competicion', this)">Competición</button>
+              </div>
+            </div>
+            <div style="font-size:10.5px; font-weight:800; color:#6b7280; text-transform:uppercase; margin-bottom:6px;">Marcas</div>
+            <div class="pos-brand-pills" id="posBrandPills" style="margin-bottom:0;"></div>
+          </div>
 
           <div class="pos-grid" id="posCatalogGrid"></div>
         </div>
@@ -368,7 +402,7 @@
 
   <!-- MODAL NUEVO PRODUCTO -->
   <div class="modal-backdrop" id="posNewProductModal" onclick="if(event.target===this)this.classList.remove('open')">
-    <div class="modal-box">
+    <div class="modal-box" style="max-width:620px; max-height:92vh; overflow-y:auto;">
       <div class="cart-head">
         <h2>+ Nuevo Producto (Local + Web)</h2>
         <button type="button" onclick="document.getElementById('posNewProductModal').classList.remove('open')" style="background:none; border:none; font-size:20px; cursor:pointer; color:var(--ink);">✕</button>
@@ -397,14 +431,40 @@
             <option value="casual">Casual / Informal</option>
           </select>
         </div>
-        <div class="form-grid">
-          <div class="field"><label>Precio Lista / Tarjetas (ARS) *</label><input type="number" id="pnpPrice" value="350000" required></div>
-          <div class="field"><label>Precio Efectivo / Transf. (ARS)</label><input type="number" id="pnpCashPrice" placeholder="Auto -15% si vacío"></div>
+        <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px;">
+          <div class="field"><label>Precio Lista / Tarjetas *</label><input type="number" id="pnpPrice" value="350000" min="0" required></div>
+          <div class="field"><label>Precio Efectivo / Transf.</label><input type="number" id="pnpCashPrice" min="0" placeholder="Auto -15% si vacío"></div>
+          <div class="field"><label>Precio tachado (oferta)</label><input type="number" id="pnpComparePrice" min="0" placeholder="Sin oferta"></div>
         </div>
-        <div class="field"><label>Color</label><input type="text" id="pnpColor" value="Negro Mate"></div>
-        <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; cursor:pointer;">
-          <input type="checkbox" id="pnpIsOutlet"> 🏷️ Es producto Outlet (Usado)
-        </label>
+        <div class="form-grid" style="align-items:center;">
+          <div class="field"><label>Color</label><input type="text" id="pnpColor" value="Negro Mate"></div>
+          <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; cursor:pointer; padding-top:16px;">
+            <input type="checkbox" id="pnpIsOutlet"> 🏷️ Es producto Outlet (Usado)
+          </label>
+        </div>
+        <div class="field">
+          <label>Descripción</label>
+          <textarea id="pnpDescription" rows="3" placeholder="Detalles, estado, homologación, accesorios incluidos..." style="width:100%; padding:10px 12px; border-radius:9px; border:1px solid #d1d5db; background:#f8f9fa; color:#111; font-family:inherit; font-size:13px; resize:vertical;"></textarea>
+        </div>
+
+        <!-- FOTOS -->
+        <div style="padding:12px; border-radius:10px; background:#f8f9fa; border:1px solid #e5e7eb;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
+            <strong style="font-size:13px; color:#111;">📷 Fotos del producto</strong>
+            <label class="btn btn-outline" style="height:30px; padding:0 10px; font-size:11.5px; cursor:pointer;">
+              📤 Subir foto desde PC
+              <input type="file" id="pnpImageFileInput" accept="image/png,image/jpeg,image/webp" style="display:none;" onchange="window.WhipPOS.uploadNewImage(this)">
+            </label>
+          </div>
+          <div id="pnpImagesList" style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
+            <div style="font-size:12px; color:#6b7280;">Sin fotos cargadas todavía.</div>
+          </div>
+          <div style="display:flex; gap:6px;">
+            <input type="text" id="pnpImageUrlInput" placeholder="O pegá una URL de imagen (https://...)" style="flex:1; height:34px; padding:0 10px; border-radius:8px; border:1px solid #d1d5db; background:#fff; color:#111; font-size:12px;">
+            <button type="button" class="btn btn-outline" style="height:34px; padding:0 12px; font-size:12px;" onclick="window.WhipPOS.addNewImageUrl()">+ Agregar</button>
+          </div>
+        </div>
+
         <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px;">
           <div class="field"><label>Stock S</label><input type="number" id="pnpStockS" value="1" min="0"></div>
           <div class="field"><label>Stock M</label><input type="number" id="pnpStockM" value="3" min="0"></div>
@@ -541,6 +601,20 @@
     </div>
   </div>
 
+  <!-- MODAL SELECCIÓN RÁPIDA DE TALLE (POS) -->
+  <div class="modal-backdrop" id="posPickVariantModal" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="modal-box" style="max-width:400px;">
+      <div class="cart-head">
+        <h2 id="pickVariantTitle" style="font-size:15px; margin:0;">Elegí el talle</h2>
+        <button type="button" onclick="document.getElementById('posPickVariantModal').classList.remove('open')" style="background:none; border:none; font-size:20px; cursor:pointer;">✕</button>
+      </div>
+      <div style="padding:18px; display:flex; flex-direction:column; gap:12px;">
+        <div id="pickVariantSub" style="font-size:12.5px; color:#6b7280;"></div>
+        <div id="pickVariantButtons" style="display:grid; grid-template-columns:repeat(2, 1fr); gap:8px;"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL TICKET IMPRIMIBLE -->
   <div class="modal-backdrop" id="receiptModal" onclick="if(event.target===this)this.classList.remove('open')">
     <div class="modal-box" style="max-width:420px;">
@@ -589,6 +663,6 @@
   <div id="posToast" class="pos-toast"></div>
 {% endif %}
 
-<script src="{{ url_for('static', filename='js/pos.js') }}?v=9"></script>
+<script src="{{ url_for('static', filename='js/pos.js') }}?v=12"></script>
 </body>
 </html>

@@ -104,6 +104,80 @@ body {
   box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.1);
 }
 
+.pos-cat-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.pos-cat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1.5px solid #d1d5db;
+  background: #ffffff;
+  color: #111111;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.14s;
+}
+
+.pos-cat-card strong {
+  font-size: 12.5px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.pos-cat-card span {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+}
+
+.pos-cat-card:hover {
+  border-color: #111111;
+}
+
+.pos-cat-card.active {
+  background: #111111;
+  border-color: #111111;
+  color: #ffffff;
+}
+
+.pos-cat-card.active span {
+  color: #d1d5db;
+}
+
+.pos-cat-card.outlet {
+  border-color: #fecaca;
+}
+
+.pos-cat-card.outlet strong {
+  color: #e63946;
+}
+
+.pos-cat-card.outlet.active {
+  background: #e63946;
+  border-color: #e63946;
+  color: #ffffff;
+}
+
+.pos-cat-card.outlet.active strong,
+.pos-cat-card.outlet.active span {
+  color: #ffffff;
+}
+
+@media (max-width: 720px) {
+  .pos-cat-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 .pos-brand-pills {
   display: flex;
   flex-wrap: wrap;
@@ -126,12 +200,14 @@ body {
   display: flex;
   flex-direction: column;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-  transition: border-color 0.15s, box-shadow 0.15s;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.12s;
 }
 
 .pos-card:hover {
   border-color: #111111;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.07);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
 }
 
 .pos-card-top {

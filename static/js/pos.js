@@ -9,6 +9,8 @@
     recentSales: [],
     recentMovements: [],
     cart: [], // { variant_id, product_id, name, size, color, sku, price, stock, quantity }
+    selectedCategory: "todas",
+    selectedSubcat: "",
     selectedBrand: "TODAS",
     salesFilter: "ALL",
     stockPage: 1,
@@ -102,17 +104,49 @@
   }
 
   // ---------------- CATALOG & SCANNER ----------------
+  function matchesPosCategory(p, cat) {
+    if (cat === "todas") return true;
+    if (cat === "outlet") return Boolean(p.is_outlet);
+    if (p.category_slug !== cat) return false;
+    if (cat === "indumentaria" && state.selectedSubcat) {
+      return (p.subcategory || "") === state.selectedSubcat;
+    }
+    return true;
+  }
+
   function renderBrands() {
-    const wrap = document.getElementById("posBrandPills");
-    if (!wrap) return;
     const activeProds = state.products.filter((p) => p.is_active);
-    const brands = ["TODAS", ...Array.from(new Set(activeProds.map((p) => p.brand))).sort()];
+    const setCnt = (id, n) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = `${n} u.`;
+    };
+    setCnt("posCatCountTodas", activeProds.length);
+    setCnt("posCatCountCascos", activeProds.filter((p) => p.category_slug === "cascos").length);
+    setCnt("posCatCountIndumentaria", activeProds.filter((p) => p.category_slug === "indumentaria").length);
+    setCnt("posCatCountAntiparras", activeProds.filter((p) => p.category_slug === "antiparras").length);
+    setCnt("posCatCountOutlet", activeProds.filter((p) => p.is_outlet).length);
+
+    const drawer = document.getElementById("posBrandDrawer");
+    const subWrap = document.getElementById("posSubcatWrap");
+    const wrap = document.getElementById("posBrandPills");
+    if (!drawer || !wrap) return;
+
+    if (state.selectedCategory === "todas") {
+      drawer.style.display = "none";
+      return;
+    }
+    if (subWrap) {
+      subWrap.style.display = state.selectedCategory === "indumentaria" ? "block" : "none";
+    }
+    const catProds = activeProds.filter((p) => matchesPosCategory(p, state.selectedCategory));
+    const brands = ["TODAS", ...Array.from(new Set(catProds.map((p) => p.brand))).sort()];
     wrap.innerHTML = brands
       .map(
         (b) =>
           `<button type="button" class="pill-btn ${state.selectedBrand === b ? "active" : ""}" onclick="window.WhipPOS.setBrand('${b.replace(/'/g, "\\'")}')">${b === "TODAS" ? "Todas las marcas" : b}</button>`
       )
       .join("");
+    drawer.style.display = "block";
   }
 
   function renderCatalog() {
@@ -122,6 +156,7 @@
 
     const filtered = state.products.filter((p) => {
       if (!p.is_active) return false;
+      if (!matchesPosCategory(p, state.selectedCategory)) return false;
       if (state.selectedBrand !== "TODAS" && p.brand !== state.selectedBrand) return false;
       if (!q) return true;
       const inMeta = p.name.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q);
@@ -141,14 +176,14 @@
           .map((v) => {
             const disabled = v.stock <= 0 ? "disabled" : "";
             const lowCls = v.stock > 0 && v.stock <= 2 ? "low" : "";
-            return `<button type="button" class="pos-size-btn ${lowCls}" ${disabled} title="SKU: ${v.sku}" onclick="window.WhipPOS.addVariant(${v.id})">
+            return `<button type="button" class="pos-size-btn ${lowCls}" ${disabled} title="SKU: ${v.sku}" onclick="event.stopPropagation(); window.WhipPOS.addVariant(${v.id})">
               <span>${v.size}</span>
               <span class="st-qty">${v.stock}</span>
             </button>`;
           })
           .join("");
 
-        return `<article class="pos-card">
+        return `<article class="pos-card" onclick="window.WhipPOS.clickProductCard(${p.id})" title="Clic para agregar o elegir talle">
           <div class="pos-card-top">
             <div class="pos-card-thumb"><img src="${img}" alt="${p.name}"></div>
             <div class="pos-card-info">
@@ -162,6 +197,32 @@
         </article>`;
       })
       .join("");
+  }
+
+  function clickProductCard(productId) {
+    const p = state.products.find((x) => x.id === productId);
+    if (!p) return;
+    const available = (p.variants || []).filter((v) => v.stock > 0);
+    if (available.length === 0) {
+      toast("Sin stock disponible para " + p.name, true);
+      return;
+    }
+    if (available.length === 1) {
+      addVariant(available[0].id);
+      return;
+    }
+    // Múltiples talles disponibles -> abrir selector rápido
+    document.getElementById("pickVariantTitle").textContent = p.name;
+    document.getElementById("pickVariantSub").textContent = `${p.brand} · Lista: ${fmt(p.price)} · Ef/Tr: ${fmt(p.transfer_price)}`;
+    document.getElementById("pickVariantButtons").innerHTML = available
+      .map(
+        (v) => `<button type="button" class="btn btn-outline" style="height:52px; flex-direction:column; gap:2px; border-color:#111; color:#111;" onclick="window.WhipPOS.addVariant(${v.id}); document.getElementById('posPickVariantModal').classList.remove('open');">
+          <strong style="font-size:15px;">Talle ${v.size}</strong>
+          <span style="font-size:11px; color:#00a650; font-weight:700;">Stock: ${v.stock} u.</span>
+        </button>`
+      )
+      .join("");
+    document.getElementById("posPickVariantModal").classList.add("open");
   }
 
   function findVariantLocally(variantId) {
@@ -800,21 +861,60 @@
   // ---------------- EDITAR PRODUCTO COMPLETO ----------------
   let editImages = [];
 
+  function renderImageListHtml(images, mode) {
+    if (!images.length) {
+      return `<div style="font-size:12px; color:#6b7280;">Sin fotos cargadas todavía. La primera que subas será la <strong>Portada</strong>.</div>`;
+    }
+    return images
+      .map((url, idx) => {
+        const isCover = idx === 0;
+        return `<div style="position:relative; width:96px; border-radius:10px; background:#ffffff; padding:5px; border:${isCover ? "2px solid #111111" : "1px solid #d1d5db"}; display:flex; flex-direction:column; gap:4px; align-items:center;">
+          <div style="width:84px; height:72px; border-radius:6px; background:#f8f9fa; padding:3px; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+            <img src="${url}" alt="" style="width:100%; height:100%; object-fit:contain;">
+          </div>
+          <button type="button" onclick="window.WhipPOS.removeImage('${mode}', ${idx})" title="Quitar foto" style="position:absolute; top:-7px; right:-7px; width:20px; height:20px; border-radius:50%; border:none; background:#e63946; color:#fff; font-size:11px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center;">✕</button>
+          ${
+            isCover
+              ? `<span style="width:100%; text-align:center; font-size:10px; font-weight:800; background:#111111; color:#ffffff; padding:2px 4px; border-radius:5px;">★ PORTADA</span>`
+              : `<button type="button" onclick="window.WhipPOS.setCoverImage('${mode}', ${idx})" title="Usar como foto principal" style="width:100%; font-size:10px; font-weight:700; background:#f3f4f6; color:#111; border:1px solid #d1d5db; padding:2px 4px; border-radius:5px; cursor:pointer;">★ Portada</button>`
+          }
+          <div style="display:flex; justify-content:space-between; align-items:center; width:100%; gap:3px;">
+            <button type="button" ${idx === 0 ? "disabled" : ""} onclick="window.WhipPOS.moveImage('${mode}', ${idx}, -1)" title="Mover a la izquierda" style="flex:1; height:20px; font-size:11px; font-weight:800; border-radius:4px; border:1px solid #d1d5db; background:#fff; color:#111; cursor:pointer; opacity:${idx === 0 ? "0.35" : "1"};">‹</button>
+            <span style="font-size:10px; color:#6b7280; font-weight:700;">#${idx + 1}</span>
+            <button type="button" ${idx === images.length - 1 ? "disabled" : ""} onclick="window.WhipPOS.moveImage('${mode}', ${idx}, 1)" title="Mover a la derecha" style="flex:1; height:20px; font-size:11px; font-weight:800; border-radius:4px; border:1px solid #d1d5db; background:#fff; color:#111; cursor:pointer; opacity:${idx === images.length - 1 ? "0.35" : "1"};">›</button>
+          </div>
+        </div>`;
+      })
+      .join("");
+  }
+
   function renderEditImages() {
     const wrap = document.getElementById("epImagesList");
-    if (!wrap) return;
-    if (!editImages.length) {
-      wrap.innerHTML = `<div style="font-size:12px; color:var(--muted);">Sin fotos cargadas.</div>`;
-      return;
-    }
-    wrap.innerHTML = editImages
-      .map(
-        (url, idx) => `<div style="position:relative; width:74px; height:74px; border-radius:9px; background:#f6f4ee; padding:4px; border:1px solid var(--border);">
-          <img src="${url}" alt="" style="width:100%; height:100%; object-fit:contain;">
-          <button type="button" onclick="window.WhipPOS.removeEditImage(${idx})" title="Quitar foto" style="position:absolute; top:-6px; right:-6px; width:20px; height:20px; border-radius:50%; border:none; background:#ef4444; color:#fff; font-size:11px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center;">✕</button>
-        </div>`
-      )
-      .join("");
+    if (wrap) wrap.innerHTML = renderImageListHtml(editImages, "edit");
+  }
+
+  function setCoverImage(mode, idx) {
+    const arr = mode === "new" ? newImages : editImages;
+    if (idx <= 0 || idx >= arr.length) return;
+    const [picked] = arr.splice(idx, 1);
+    arr.unshift(picked);
+    mode === "new" ? renderNewImages() : renderEditImages();
+  }
+
+  function moveImage(mode, idx, delta) {
+    const arr = mode === "new" ? newImages : editImages;
+    const target = idx + delta;
+    if (target < 0 || target >= arr.length) return;
+    const tmp = arr[idx];
+    arr[idx] = arr[target];
+    arr[target] = tmp;
+    mode === "new" ? renderNewImages() : renderEditImages();
+  }
+
+  function removeImage(mode, idx) {
+    const arr = mode === "new" ? newImages : editImages;
+    arr.splice(idx, 1);
+    mode === "new" ? renderNewImages() : renderEditImages();
   }
 
   function addEditVariantRow(v = { id: "", size: "", color: "Negro Mate", sku: "", stock: 0 }) {
@@ -954,6 +1054,49 @@
     }
   });
 
+  let newImages = [];
+
+  function renderNewImages() {
+    const wrap = document.getElementById("pnpImagesList");
+    if (wrap) wrap.innerHTML = renderImageListHtml(newImages, "new");
+  }
+
+  async function uploadNewImage(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append("file", file);
+    try {
+      const res = await fetch("/api/admin/upload-image", { method: "POST", body: fd });
+      const data = await res.json();
+      if (data.ok && data.url) {
+        newImages.push(data.url);
+        renderNewImages();
+        toast("📷 Foto subida correctamente");
+      } else {
+        toast(data.error || "Error subiendo imagen", true);
+      }
+    } catch {
+      toast("Error de conexión al subir imagen", true);
+    } finally {
+      input.value = "";
+    }
+  }
+
+  function addNewImageUrl() {
+    const inp = document.getElementById("pnpImageUrlInput");
+    const url = (inp?.value || "").trim();
+    if (!url) return;
+    newImages.push(url);
+    inp.value = "";
+    renderNewImages();
+  }
+
+  function removeNewImage(idx) {
+    newImages.splice(idx, 1);
+    renderNewImages();
+  }
+
   document.getElementById("posNewProductForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const payload = {
@@ -963,7 +1106,10 @@
       subcategory: document.getElementById("pnpCategory").value === "indumentaria" ? (document.getElementById("pnpSubcategory")?.value || "competicion") : "",
       price: parseInt(document.getElementById("pnpPrice").value || "0", 10),
       cash_price: parseInt(document.getElementById("pnpCashPrice").value || "0", 10) || null,
+      compare_at_price: parseInt(document.getElementById("pnpComparePrice").value || "0", 10) || null,
       color: document.getElementById("pnpColor").value.trim(),
+      description: document.getElementById("pnpDescription").value.trim(),
+      images: newImages,
       is_outlet: Boolean(document.getElementById("pnpIsOutlet")?.checked),
       stock_s: parseInt(document.getElementById("pnpStockS").value || "0", 10),
       stock_m: parseInt(document.getElementById("pnpStockM").value || "0", 10),
@@ -979,6 +1125,12 @@
     if (data.ok) {
       document.getElementById("posNewProductModal").classList.remove("open");
       document.getElementById("pnpName").value = "";
+      document.getElementById("pnpComparePrice").value = "";
+      document.getElementById("pnpCashPrice").value = "";
+      document.getElementById("pnpDescription").value = "";
+      document.getElementById("pnpImageUrlInput").value = "";
+      newImages = [];
+      renderNewImages();
       toast("✅ Producto creado y publicado en la tienda");
       await loadState();
     } else {
@@ -1186,11 +1338,30 @@
         setTimeout(() => document.getElementById("posScannerInput")?.focus(), 50);
       }
     },
+    setPosCategory(cat, btn) {
+      state.selectedCategory = cat;
+      state.selectedSubcat = "";
+      state.selectedBrand = "TODAS";
+      document.querySelectorAll("#posCategoryCards .pos-cat-card").forEach((b) => b.classList.remove("active"));
+      if (btn) btn.classList.add("active");
+      document.querySelectorAll("#posSubcatPills .pill-btn").forEach((b) => b.classList.toggle("active", b.dataset.sub === ""));
+      renderBrands();
+      renderCatalog();
+    },
+    setPosSubcat(sub, btn) {
+      state.selectedSubcat = sub;
+      state.selectedBrand = "TODAS";
+      document.querySelectorAll("#posSubcatPills .pill-btn").forEach((b) => b.classList.remove("active"));
+      if (btn) btn.classList.add("active");
+      renderBrands();
+      renderCatalog();
+    },
     setBrand(b) {
       state.selectedBrand = b;
       renderBrands();
       renderCatalog();
     },
+    clickProductCard,
     setChannel(ch, btn) {
       state.channel = ch;
       document.querySelectorAll("#posChannelGroup .pos-choice-btn").forEach((b) => b.classList.remove("active"));
@@ -1241,6 +1412,12 @@
     uploadEditImage,
     addEditImageUrl,
     removeEditImage,
+    uploadNewImage,
+    addNewImageUrl,
+    removeNewImage,
+    setCoverImage,
+    moveImage,
+    removeImage,
     addEditVariantRow,
     setSalesFilter(f, btn) {
       state.salesFilter = f;

@@ -915,7 +915,14 @@ def api_admin_create_product():
     price = max(1000, int(data.get("price") or 350000))
     cp_raw = data.get("cash_price")
     cash_price = int(cp_raw) if cp_raw and int(cp_raw) > 0 else None
+    cap_raw = data.get("compare_at_price")
+    compare_at_price = int(cap_raw) if cap_raw and int(cap_raw) > 0 else None
     color = (data.get("color") or "Negro Mate").strip()
+    description = (data.get("description") or "").strip() or "Producto cargado desde el gestor Whip POS."
+    raw_imgs = data.get("images") if isinstance(data.get("images"), list) else []
+    cleaned_imgs = [str(u).strip() for u in raw_imgs if str(u).strip()]
+    if not cleaned_imgs:
+        cleaned_imgs = ["/static/images/cat-cascos.jpg"]
     stock_s = max(0, int(data.get("stock_s") or 0))
     stock_m = max(0, int(data.get("stock_m") or 0))
     stock_l = max(0, int(data.get("stock_l") or 0))
@@ -932,16 +939,14 @@ def api_admin_create_product():
         category=cat,
         price=price,
         cash_price=cash_price,
+        compare_at_price=compare_at_price,
         transfer_discount=15,
         is_active=True,
         is_featured=True,
         is_outlet=bool(data.get("is_outlet", False)),
         subcategory=str(data.get("subcategory") or "").strip().lower(),
-        description="Producto cargado desde el gestor Whip POS.",
-        images_json=[
-            "/static/images/cascos/Fox-V1-Rojo frontal.png",
-            "/static/images/cascos/Fox-V1-Rojo izquierda.png",
-        ],
+        description=description,
+        images_json=cleaned_imgs,
         specs_json={
             "Homologación": "ECE 22.06 / DOT",
             "Peso aproximado": "1.350 g",
