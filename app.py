@@ -825,6 +825,48 @@ def api_admin_update_variant(variant_id):
     return jsonify({"ok": True, "variant": variant.to_dict()})
 
 
+@app.route("/api/pos/web-orders-ping", methods=["GET"])
+def api_pos_web_orders_ping():
+    unauth = require_admin()
+    if unauth:
+        return unauth
+    after_raw = request.args.get("after_id", "").strip()
+    base_q = Order.query.filter(Order.channel == "WEB", Order.payment_status != "CANCELLED")
+    latest = base_q.order_by(Order.id.desc()).first()
+    latest_id = latest.id if latest else 0
+
+    if not after_raw:
+        return jsonify({"ok": True, "latest_id": latest_id, "new_orders": []})
+
+    try:
+        after_id = int(after_raw)
+    except ValueError:
+        return jsonify({"ok": True, "latest_id": latest_id, "new_orders": []})
+
+    new_orders = base_q.filter(Order.id > after_id).order_by(Order.id.asc()).all()
+    payload = []
+    for o in new_orders:
+        payload.append(
+            {
+                "id": o.id,
+                "order_number": o.order_number,
+                "customer_name": o.customer_name,
+                "total": o.total,
+                "payment_method": o.payment_method,
+                "payment_status": o.payment_status,
+                "items": [
+                    {
+                        "product_name": it.product_name,
+                        "variant_label": it.variant_label,
+                        "quantity": it.quantity,
+                    }
+                    for it in o.items
+                ],
+            }
+        )
+    return jsonify({"ok": True, "latest_id": latest_id, "new_orders": payload})
+
+
 @app.route("/api/admin/upload-image", methods=["POST"])
 def api_admin_upload_image():
     unauth = require_admin()

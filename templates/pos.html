@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=5">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/pos.css') }}?v=6">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/pos.css') }}?v=7">
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 </head>
 <body>
@@ -655,9 +655,10 @@
     </div>
   </div>
 
+  <div id="webOrderAlertStack" class="web-order-alert-stack" aria-live="assertive"></div>
   <div id="posToast" class="pos-toast"></div>
 {% endif %}
 
-<script src="{{ url_for('static', filename='js/pos.js') }}?v=18"></script>
+<script src="{{ url_for('static', filename='js/pos.js') }}?v=20"></script>
 </body>
 </html>

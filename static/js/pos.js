@@ -1718,5 +1718,113 @@
     },
   };
 
+  // ---------------- NOTIFICACIONES EN TIEMPO REAL DE VENTAS WEB ----------------
+  let lastSeenWebOrderId = null;
+
+  function playSaleChime() {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const now = ctx.currentTime;
+      [587.33, 880].forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, now + idx * 0.14);
+        gain.gain.setValueAtTime(0.001, now + idx * 0.14);
+        gain.gain.exponentialRampToValueAtTime(0.18, now + idx * 0.14 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.14 + 0.32);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + idx * 0.14);
+        osc.stop(now + idx * 0.14 + 0.35);
+      });
+    } catch {
+      // Silencioso si el navegador bloquea audio sin interacción previa
+    }
+  }
+
+  function showWebOrderAlert(order) {
+    const stack = document.getElementById("webOrderAlertStack");
+    if (!stack) return;
+
+    const itemsSummary = (order.items || [])
+      .map((it) => `${it.quantity}× ${it.product_name}${it.variant_label ? ` (${it.variant_label})` : ""}`)
+      .join(", ");
+
+    const card = document.createElement("div");
+    card.className = "web-order-alert";
+    card.innerHTML = `
+      <div class="web-order-alert-head">
+        <span class="web-order-alert-title">🌐 ¡Nueva venta web! #${order.order_number}</span>
+        <button type="button" class="web-order-alert-close" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="web-order-alert-body">
+        <div><strong>${order.customer_name || "Cliente web"}</strong> · ${fmt(order.total)} (${order.payment_method})</div>
+        ${itemsSummary ? `<div style="margin-top:4px; color:#d1d5db;">${itemsSummary}</div>` : ""}
+      </div>
+      <div class="web-order-alert-actions">
+        <button type="button" class="btn btn-cta" style="height:32px; padding:0 12px; font-size:12px; flex:1;">Ver en Ventas y Pedidos →</button>
+      </div>
+    `;
+
+    card.querySelector(".web-order-alert-close").addEventListener("click", () => card.remove());
+    card.querySelector(".btn-cta").addEventListener("click", () => {
+      card.remove();
+      window.WhipPOS.switchTab("ventas");
+      const webFilterBtn = document.querySelector('.sales-filter-btn[onclick*="WEB"]');
+      window.WhipPOS.setSalesFilter("WEB", webFilterBtn || null);
+    });
+    stack.prepend(card);
+
+    if ("Notification" in window && Notification.permission === "granted") {
+      try {
+        new Notification(`¡Nueva venta web! Pedido #${order.order_number}`, {
+          body: `${order.customer_name || "Cliente"} · ${fmt(order.total)}\n${itemsSummary}`,
+        });
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  async function pollWebOrders(isInitial = false) {
+    try {
+      const qs = !isInitial && lastSeenWebOrderId !== null ? `?after_id=${lastSeenWebOrderId}` : "";
+      const res = await fetch(`/api/pos/web-orders-ping${qs}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data.ok) return;
+
+      if (isInitial || lastSeenWebOrderId === null) {
+        lastSeenWebOrderId = data.latest_id || 0;
+        return;
+      }
+
+      if (Array.isArray(data.new_orders) && data.new_orders.length > 0) {
+        lastSeenWebOrderId = Math.max(lastSeenWebOrderId, data.latest_id || 0);
+        playSaleChime();
+        data.new_orders.forEach((o) => showWebOrderAlert(o));
+        loadState();
+      }
+    } catch {
+      // Reintentará en el próximo intervalo
+    }
+  }
+
+  // Pedir permiso de notificaciones de escritorio en la primera interacción del usuario en /pos
+  document.addEventListener(
+    "click",
+    () => {
+      if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission().catch(() => {});
+      }
+    },
+    { once: true }
+  );
+
   loadState();
+  pollWebOrders(true);
+  setInterval(() => pollWebOrders(false), 30 * 60 * 1000);
 })();
