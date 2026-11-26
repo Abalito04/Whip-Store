@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Finalizar compra | Whip Store{% endblock %}
+{% block head_extra %}<meta name="robots" content="noindex, nofollow">{% endblock %}
 {% block content %}
 <div class="container" style="padding: 36px 18px 64px; max-width: 1100px;">
   <div id="checkoutContainer">
@@ -407,12 +408,20 @@
         `¡Hola Whip Helmets! Acabo de realizar el pedido #${ord.order_number} por ${window.WhipStore.formatARS(ord.total)} y envío mi comprobante.`
       );
 
+      const esc = (s) =>
+        String(s ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+
       box.innerHTML = `
         <div class="card-panel" style="padding:30px;">
           <div style="text-align:center;">
             <div style="font-size:44px;">✅</div>
-            <span class="section-eyebrow">Pedido #${ord.order_number} confirmado</span>
-            <h1 style="margin:6px 0 8px; font-size:26px;">¡Gracias por tu compra, ${ord.customer_name.split(" ")[0]}!</h1>
+            <span class="section-eyebrow">Pedido #${esc(ord.order_number)} confirmado</span>
+            <h1 style="margin:6px 0 8px; font-size:26px;">¡Gracias por tu compra, ${esc((ord.customer_name || "").split(" ")[0])}!</h1>
             <p style="font-size:13.5px; color:#6b7280; margin:0 0 22px;">El stock quedó reservado automáticamente.</p>
           </div>
           ${

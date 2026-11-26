@@ -1,5 +1,12 @@
 (function () {
   const fmt = (n) => "$ " + Math.round(Number(n) || 0).toLocaleString("es-AR");
+  const esc = (s) =>
+    String(s ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
 
   const state = {
     products: [],
@@ -417,7 +424,7 @@
     const itemsRows = (order.items || [])
       .map(
         (i) => `<div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-          <span>${i.quantity}x ${i.product_name}<br><small>${i.variant_label}</small></span>
+          <span>${i.quantity}x ${esc(i.product_name)}<br><small>${esc(i.variant_label)}</small></span>
           <strong>${fmt(i.unit_price * i.quantity)}</strong>
         </div>`
       )
@@ -427,11 +434,11 @@
       <h3>WHIP HELMETS ARGENTINA</h3>
       <div style="text-align:center; font-size:11px;">Comprobante interno de venta</div>
       <div class="receipt-divider"></div>
-      <div><strong>Ticket:</strong> #${order.order_number}</div>
-      <div><strong>Fecha:</strong> ${order.created_at}</div>
-      <div><strong>Canal:</strong> ${order.channel} · <strong>Pago:</strong> ${order.payment_method}</div>
-      ${order.notes ? `<div><strong>Comprobante:</strong> ${order.notes.replace(/^Comp:\s*/i, "")}</div>` : ""}
-      <div><strong>Cliente:</strong> ${order.customer_name}</div>
+      <div><strong>Ticket:</strong> #${esc(order.order_number)}</div>
+      <div><strong>Fecha:</strong> ${esc(order.created_at)}</div>
+      <div><strong>Canal:</strong> ${esc(order.channel)} · <strong>Pago:</strong> ${esc(order.payment_method)}</div>
+      ${order.notes ? `<div><strong>Comprobante:</strong> ${esc(order.notes.replace(/^Comp:\s*/i, ""))}</div>` : ""}
+      <div><strong>Cliente:</strong> ${esc(order.customer_name)}</div>
       <div class="receipt-divider"></div>
       ${itemsRows}
       <div class="receipt-divider"></div>
@@ -1498,13 +1505,13 @@
               <div style="font-size:11px; color:#6b7280; margin-top:3px;">${timePart || o.created_at}</div>
             </td>
             <td>
-              <strong>${o.customer_name}</strong>
-              <div style="font-size:11.5px; color:#6b7280; max-width:260px;">${itemsSummary}</div>
+              <strong>${esc(o.customer_name)}</strong>
+              <div style="font-size:11.5px; color:#6b7280; max-width:260px;">${esc(itemsSummary)}</div>
             </td>
             <td>
               <strong>${fmt(o.total)}</strong>
-              <div style="font-size:11px; color:#6b7280;">${o.payment_method}</div>
-              ${o.notes ? `<div style="font-size:10.5px; color:#111; font-family:monospace;">${o.notes}</div>` : ""}
+              <div style="font-size:11px; color:#6b7280;">${esc(o.payment_method)}</div>
+              ${o.notes ? `<div style="font-size:10.5px; color:#111; font-family:monospace;">${esc(o.notes)}</div>` : ""}
             </td>
             <td>
               <select onchange="window.WhipPOS.updateOrderField(${o.id}, 'payment_status', this.value)" style="height:30px; border-radius:7px; border:1px solid #d1d5db; background:#fff; color:#111; font-size:12px; padding:0 6px;">
@@ -1522,7 +1529,7 @@
                   <option value="DELIVERED" ${o.shipping_status === "DELIVERED" ? "selected" : ""}>Entregado</option>
                 </select>
                 ${ch === "WEB" ? `<div style="display:flex; gap:4px;">
-                  <input type="text" id="trk-${o.id}" value="${o.tracking_code || ""}" placeholder="Tracking..." style="width:110px; height:26px; font-size:11px; padding:0 6px; border-radius:6px; border:1px solid #d1d5db; background:#fff; color:#111;">
+                  <input type="text" id="trk-${o.id}" value="${esc(o.tracking_code || "")}" placeholder="Tracking..." style="width:110px; height:26px; font-size:11px; padding:0 6px; border-radius:6px; border:1px solid #d1d5db; background:#fff; color:#111;">
                   <button type="button" class="btn btn-outline" style="height:26px; padding:0 6px; font-size:10.5px;" onclick="window.WhipPOS.saveTracking(${o.id})">OK</button>
                 </div>` : ""}
               </div>
@@ -1757,12 +1764,12 @@
     card.className = "web-order-alert";
     card.innerHTML = `
       <div class="web-order-alert-head">
-        <span class="web-order-alert-title">🌐 ¡Nueva venta web! #${order.order_number}</span>
+        <span class="web-order-alert-title">🌐 ¡Nueva venta web! #${esc(order.order_number)}</span>
         <button type="button" class="web-order-alert-close" aria-label="Cerrar">✕</button>
       </div>
       <div class="web-order-alert-body">
-        <div><strong>${order.customer_name || "Cliente web"}</strong> · ${fmt(order.total)} (${order.payment_method})</div>
-        ${itemsSummary ? `<div style="margin-top:4px; color:#d1d5db;">${itemsSummary}</div>` : ""}
+        <div><strong>${esc(order.customer_name || "Cliente web")}</strong> · ${fmt(order.total)} (${esc(order.payment_method)})</div>
+        ${itemsSummary ? `<div style="margin-top:4px; color:#d1d5db;">${esc(itemsSummary)}</div>` : ""}
       </div>
       <div class="web-order-alert-actions">
         <button type="button" class="btn btn-cta" style="height:32px; padding:0 12px; font-size:12px; flex:1;">Ver en Ventas y Pedidos →</button>

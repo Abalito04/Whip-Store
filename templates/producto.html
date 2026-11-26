@@ -1,5 +1,34 @@
 {% extends "base.html" %}
+{% set _seo_imgs = product.images_json or ['/static/images/cat-cascos.jpg'] %}
+{% set _seo_img = _seo_imgs[0] if _seo_imgs[0].startswith('http') else (SITE_URL ~ _seo_imgs[0]) %}
+{% set _seo_desc = (product.brand ~ ' ' ~ product.name ~ ' — ' ~ (product.price|ars) ~ '. ' ~ (product.description or 'Stock real en Whip Store Argentina. Envíos a todo el país por Correo Argentino.'))[:160] %}
 {% block title %}{{ product.name }} | Whip Store{% endblock %}
+{% block meta_description %}{{ _seo_desc }}{% endblock %}
+{% block og_type %}product{% endblock %}
+{% block og_title %}{{ product.name }} — {{ product.price|ars }} | Whip Store{% endblock %}
+{% block og_description %}{{ _seo_desc }}{% endblock %}
+{% block og_image %}{{ _seo_img }}{% endblock %}
+{% block head_extra %}
+<script type="application/ld+json">
+{{ {
+  "@context": "https://schema.org",
+  "@type": "Product",
+  "name": product.name,
+  "image": _seo_imgs | map('replace', '/static/', SITE_URL ~ '/static/') | list,
+  "description": product.description or (product.brand ~ ' ' ~ product.name),
+  "brand": {"@type": "Brand", "name": product.brand},
+  "sku": (product.variants[0].sku if product.variants else ('WHIP-' ~ product.id)),
+  "offers": {
+    "@type": "Offer",
+    "url": SITE_URL ~ '/producto/' ~ product.slug,
+    "priceCurrency": "ARS",
+    "price": product.price,
+    "availability": ("https://schema.org/InStock" if product.total_stock > 0 else "https://schema.org/OutOfStock"),
+    "itemCondition": ("https://schema.org/UsedCondition" if product.is_outlet else "https://schema.org/NewCondition")
+  }
+} | tojson }}
+</script>
+{% endblock %}
 {% block content %}
 {% set imgs = product.images_json or ['/static/images/cat-cascos.jpg'] %}
 <div class="container" style="padding-bottom: 48px;">

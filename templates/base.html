@@ -4,8 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Whip Store | Cascos, Gafas e Indumentaria Argentina{% endblock %}</title>
+  <meta name="description" content="{% block meta_description %}Whip Store — Tienda oficial de cascos, gafas, antiparras e indumentaria motocross en Santa Rosa, La Pampa. Stock real y envíos a todo el país por Correo Argentino.{% endblock %}">
+  <link rel="canonical" href="{% block canonical %}{{ SITE_URL }}{{ request.path }}{% endblock %}">
+  <meta property="og:site_name" content="Whip Store">
+  <meta property="og:locale" content="es_AR">
+  <meta property="og:type" content="{% block og_type %}website{% endblock %}">
+  <meta property="og:title" content="{% block og_title %}Whip Store | Cascos, Gafas e Indumentaria Argentina{% endblock %}">
+  <meta property="og:description" content="{% block og_description %}Tienda oficial en Santa Rosa, La Pampa. Stock real de cascos, gafas e indumentaria con envíos a todo el país por Correo Argentino.{% endblock %}">
+  <meta property="og:url" content="{{ SITE_URL }}{{ request.path }}">
+  <meta property="og:image" content="{% block og_image %}{{ SITE_URL }}{{ url_for('static', filename='images/banner2.png') }}{% endblock %}">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}?v=1">
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='images/logo.png') }}">
+  {% block head_extra %}{% endblock %}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -195,7 +206,7 @@
     💬 <span>Consultanos por WhatsApp</span>
   </a>
 
-  <script src="{{ url_for('static', filename='js/store.js') }}?v=6"></script>
+  <script src="{{ url_for('static', filename='js/store.js') }}?v=7"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

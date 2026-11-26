@@ -1,4 +1,27 @@
 {% extends "base.html" %}
+{% block head_extra %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SportingGoodsStore",
+  "name": "Whip Store",
+  "url": "{{ SITE_URL }}/",
+  "image": "{{ SITE_URL }}{{ url_for('static', filename='images/logo.png') }}",
+  "description": "Tienda oficial de cascos, gafas, antiparras e indumentaria motocross en Santa Rosa, La Pampa. Stock real y envíos a todo el país por Correo Argentino.",
+  "telephone": "+5492954544001",
+  "address": {
+    "@type": "PostalAddress",
+    "addressLocality": "Santa Rosa",
+    "addressRegion": "La Pampa",
+    "postalCode": "6300",
+    "addressCountry": "AR"
+  },
+  "sameAs": [
+    "{{ STORE_INSTAGRAM }}"
+  ]
+}
+</script>
+{% endblock %}
 {% block content %}
 
 <!-- HERO BANNER -->

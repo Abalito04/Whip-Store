@@ -6,7 +6,7 @@ import re
 import time
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
-from flask import Flask, jsonify, redirect, render_template, request, send_file, session
+from flask import Flask, Response, jsonify, redirect, render_template, request, send_file, session
 from sqlalchemy import inspect, text
 from models import (
     CashMovement,
@@ -190,9 +190,20 @@ def format_ars(value):
         return "$ 0"
 
 
+def _site_base_url():
+    env_url = os.environ.get("BASE_URL", "").strip().rstrip("/")
+    if env_url:
+        return env_url
+    try:
+        return request.url_root.rstrip("/")
+    except RuntimeError:
+        return ""
+
+
 @app.context_processor
 def inject_globals():
     return {
+        "SITE_URL": _site_base_url(),
         "TRANSFER_DISCOUNT_PCT": TRANSFER_DISCOUNT_PCT,
         "STORE_CITY": STORE_CITY,
         "STORE_WHATSAPP": os.environ.get("WSP_NUMERO", STORE_WHATSAPP).strip(),
@@ -206,13 +217,64 @@ def inject_globals():
 
 
 # ---------------------------------------------------------------------------
-# RUTAS STOREFRONT (HTML)
+# RUTAS STOREFRONT (HTML) + SEO (robots.txt / sitemap.xml)
 # ---------------------------------------------------------------------------
 
 
 @app.route("/favicon.ico")
 def favicon():
     return app.send_static_file("favicon.ico")
+
+
+@app.route("/robots.txt")
+def robots_txt():
+    base = _site_base_url()
+    lines = [
+        "User-agent: *",
+        "Allow: /",
+        "Disallow: /pos",
+        "Disallow: /admin",
+        "Disallow: /checkout",
+        "Disallow: /pago/",
+        "Disallow: /api/",
+        "",
+        f"Sitemap: {base}/sitemap.xml",
+    ]
+    return Response("\n".join(lines) + "\n", mimetype="text/plain")
+
+
+@app.route("/sitemap.xml")
+def sitemap_xml():
+    from xml.sax.saxutils import escape as xml_esc
+
+    base = _site_base_url()
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    urls = [
+        (f"{base}/", today, "daily", "1.0"),
+        (f"{base}/categoria/cascos", today, "daily", "0.8"),
+        (f"{base}/categoria/indumentaria", today, "daily", "0.8"),
+        (f"{base}/categoria/indumentaria-competicion", today, "daily", "0.7"),
+        (f"{base}/categoria/indumentaria-casual", today, "daily", "0.7"),
+        (f"{base}/categoria/antiparras", today, "daily", "0.8"),
+        (f"{base}/categoria/outlet", today, "daily", "0.8"),
+        (f"{base}/legales", today, "monthly", "0.3"),
+    ]
+    active_products = [p for p in Product.query.filter_by(is_active=True).all() if p.total_stock > 0]
+    for p in active_products:
+        lastmod = p.created_at.strftime("%Y-%m-%d") if getattr(p, "created_at", None) else today
+        urls.append((f"{base}/producto/{p.slug}", lastmod, "daily", "0.9"))
+
+    xml_items = "".join(
+        f"<url><loc>{xml_esc(loc)}</loc><lastmod>{lm}</lastmod><changefreq>{cf}</changefreq><priority>{pr}</priority></url>"
+        for loc, lm, cf, pr in urls
+    )
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        f"{xml_items}"
+        "</urlset>"
+    )
+    return Response(xml, mimetype="application/xml")
 
 
 @app.route("/")
@@ -391,8 +453,26 @@ def api_shipping_quote():
     return jsonify({"ok": True, **quote})
 
 
+_CHECKOUT_ATTEMPTS = {}
+CHECKOUT_MAX_ATTEMPTS = 8
+CHECKOUT_WINDOW_SECONDS = 600  # 10 minutos
+
+
+def _client_ip():
+    fwd = request.headers.get("X-Forwarded-For", "")
+    return (fwd.split(",")[0].strip() if fwd else request.remote_addr) or "unknown"
+
+
 @app.route("/api/checkout", methods=["POST"])
 def api_checkout():
+    ip = _client_ip()
+    now = time.time()
+    recent_co = [t for t in _CHECKOUT_ATTEMPTS.get(ip, []) if now - t < CHECKOUT_WINDOW_SECONDS]
+    if len(recent_co) >= CHECKOUT_MAX_ATTEMPTS:
+        return jsonify({"ok": False, "error": "Demasiados intentos de compra seguidos. Esperá unos minutos."}), 429
+    recent_co.append(now)
+    _CHECKOUT_ATTEMPTS[ip] = recent_co
+
     data = request.get_json(silent=True) or {}
     items_req = data.get("items") or []
     if not items_req:
@@ -575,14 +655,17 @@ def api_checkout():
                 init_point = pref.get("init_point") or pref.get("sandbox_init_point")
                 if init_point:
                     return jsonify({"ok": True, "order": new_order.to_dict(), "init_point": init_point})
-                return jsonify({"ok": False, "error": f"Mercado Pago no devolvió link de pago: {pref}"}), 502
+                print(f"Mercado Pago no devolvió link de pago para Pedido #{new_order.order_number}: {pref}")
+                return jsonify({"ok": False, "error": "No pudimos generar el link de Mercado Pago. Intentá nuevamente o elegí Transferencia."}), 502
             except Exception as mp_exc:
-                return jsonify({"ok": False, "error": f"Error al conectar con Mercado Pago: {mp_exc}"}), 502
+                print(f"Error al conectar con Mercado Pago para Pedido #{new_order.order_number}: {mp_exc}")
+                return jsonify({"ok": False, "error": "Error al conectar con Mercado Pago. Intentá nuevamente en unos instantes."}), 502
 
         return jsonify({"ok": True, "order": new_order.to_dict()})
     except Exception as exc:
         db.session.rollback()
-        return jsonify({"ok": False, "error": f"Error al procesar el pedido: {exc}"}), 500
+        print(f"Error al procesar pedido en /api/checkout: {exc}")
+        return jsonify({"ok": False, "error": "No pudimos procesar tu pedido. Intentá nuevamente."}), 500
 
 
 def _deduct_order_stock_if_needed(order, reason_prefix="Pago MP aprobado Pedido"):
@@ -724,11 +807,6 @@ def require_admin():
 _LOGIN_ATTEMPTS = {}
 LOGIN_MAX_ATTEMPTS = 5
 LOGIN_WINDOW_SECONDS = 600  # 10 minutos
-
-
-def _client_ip():
-    fwd = request.headers.get("X-Forwarded-For", "")
-    return (fwd.split(",")[0].strip() if fwd else request.remote_addr) or "unknown"
 
 
 @app.route("/api/admin/login", methods=["POST"])

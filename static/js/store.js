@@ -199,17 +199,24 @@
         try {
           const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
           const items = await res.json();
+          const esc = (s) =>
+            String(s ?? "")
+              .replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")
+              .replace(/"/g, "&quot;")
+              .replace(/'/g, "&#39;");
           if (!items.length) {
-            dropdown.innerHTML = `<div style="padding:14px; font-size:13px; color:#b8b0a0; text-align:center;">Sin resultados para "${q}"</div>`;
+            dropdown.innerHTML = `<div style="padding:14px; font-size:13px; color:#b8b0a0; text-align:center;">Sin resultados para "${esc(q)}"</div>`;
           } else {
             dropdown.innerHTML = items
               .map(
                 (p) => `
-              <a class="search-item" href="/producto/${p.slug}">
-                <img src="${p.images[0] || "/static/images/cat-cascos.jpg"}" alt="${p.name}">
+              <a class="search-item" href="/producto/${encodeURIComponent(p.slug)}">
+                <img src="${esc(p.images[0] || "/static/images/cat-cascos.jpg")}" alt="${esc(p.name)}">
                 <div class="search-item-info">
-                  <div class="search-item-title">${p.name}</div>
-                  <div class="search-item-brand">${p.brand}</div>
+                  <div class="search-item-title">${esc(p.name)}</div>
+                  <div class="search-item-brand">${esc(p.brand)}</div>
                 </div>
                 <div class="search-item-price">${formatARS(p.price)}</div>
               </a>
